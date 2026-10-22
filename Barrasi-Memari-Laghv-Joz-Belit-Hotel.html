@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>بررسی معماری مالی لغو جزئی بلیت و هتل — بدون تغییر در کد</title>
+<style>
+  body{font-family:Tahoma,sans-serif;background:#f6f7f9;color:#1f2937;margin:0;padding:24px;line-height:1.9;font-size:14px}
+  .wrap{max-width:1000px;margin:auto}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 24px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  h1{font-size:20px;margin:6px 0 2px}
+  h2{font-size:17px;border-right:4px solid #2563eb;padding-right:10px;margin-top:28px;color:#1e3a8a}
+  h3{font-size:15px;margin:18px 0 6px;color:#111827}
+  .q{font-weight:bold;color:#0f172a;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin:14px 0 8px}
+  .badge{display:inline-block;padding:1px 10px;border-radius:999px;font-size:12px;font-weight:bold}
+  .ok{background:#dcfce7;color:#166534}.mid{background:#fef9c3;color:#854d0e}.no{background:#fee2e2;color:#991b1b}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
+  th,td{border:1px solid #e5e7eb;padding:6px 10px;text-align:right;vertical-align:top}
+  th{background:#f1f5f9}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:0 5px;direction:ltr;display:inline-block;font-size:12.5px}
+  .meta{color:#64748b;font-size:12.5px}
+  .risk{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;margin-top:8px}
+  .entry{direction:ltr;text-align:left;background:#0f172a;color:#e2e8f0;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:12.5px;line-height:1.7;white-space:pre}
+  .note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px}
+</style>
+</head>
+<body><div class="wrap">
+
+<div class="card">
+<h1>بررسی معماری مالی و حسابداری «لغو جزئی بلیت و هتل»</h1>
+<p class="meta">مبنا: کد واقعی پروژه، شاخه <code>main</code>، کامیت <code>7e84d82</code> — فایل‌های مبنا: <code>app/sales.py</code>، <code>app/models.py</code>، <code>app/services.py</code>، <code>app/statements.py</code>، <code>app/api.py</code>، <code>app/rules.py</code>، <code>app/static/app.js</code><br>
+نوع سند: صرفاً گزارش کدخوانی — هیچ تغییری در کد/دیتابیس/رابط انجام نشده است.</p>
+<p>راهنمای وضعیت: <span class="badge ok">پیاده‌سازی شده</span> <span class="badge mid">ناقص / جزئی</span> <span class="badge no">پیاده‌سازی نشده</span></p>
+</div>
+
+<h2>بخش اول — معماری مالی فعلی</h2>
+
+<div class="card">
+<div class="q">۱) هنگام ثبت فروش بلیت/هتل چه رکوردهایی ایجاد می‌شود؟</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — دو مرحله‌ی مجزا: «پیش‌نویس» و «صدور».</p>
+<p><b>محل:</b> <code>sales.create_invoice (app/sales.py:496)</code> و <code>sales.issue_invoice (app/sales.py:591)</code>؛ ترکیب سند در <code>_invoice_entry_lines (sales.py:562)</code>.</p>
+<p><b>ثبت پیش‌نویس:</b> رکورد <code>Invoice</code> + ردیف‌های <code>InvoiceLine</code> (هر ردیف: <code>service_type</code>، <code>qty</code>، <code>unit_price</code>، <code>discount</code>، <code>taxable</code>، <code>purchase_cost_rial</code>، <code>revenue_model</code>، <code>supplier_party_id</code>، <code>net/vat/rate_bp</code> محاسباتی از <code>compute_invoice (sales.py:420)</code>). در این مرحله <b>هیچ سند دفتری</b> زده نمی‌شود.</p>
+<p><b>صدور:</b> یک <code>JournalEntry</code> با این ترکیب (مثال عددی — فروش تور ۶۰ + بلیت ۴۰، مالیات‌دار نباشند):</p>
+<div class="entry">Dr 1103 مشتری (تفصیلی) ............ 100
+   Cr 4101 درآمد تور ................ 60
+   Cr 4102 درآمد بلیت ............... 40
+اگر ردیفی taxable باشد → Cr 2104 مالیات ارزش افزوده فروش (نرخ تاریخ‌دار، از ۱۴۰۴ = ۱۰٪)
+اگر ردیف revenue_model=commission باشد:
+   Cr 4105 فقط (net − purchase_cost) = کمیسیون آژانس
+   Cr 2108 «سهم امانی/بدهی به ایرلاین» = purchase_cost</div>
+<p><b>نکته‌ی کلیدی:</b> صورتحساب تأمین‌کننده (<code>SupplierBill</code>) هنگام فروش <b>خودکار ساخته نمی‌شود</b>؛ حسابدار آن را جداگانه ثبت می‌کند (<code>sales.create_bill ~930</code>) و می‌تواند با <code>source_invoice_id</code> به فاکتور پیوند بزند. سند قبض: <span dir="ltr">Dr 5101 هزینه / Cr 2101 تأمین</span> (+ مالیات خرید <code>1107</code>).</p>
+<div class="risk"><b>ریسک:</b> درآمد و هزینه دو چرخه‌ی مستقل‌اند؛ تا قبض تأمین ثبت نشود، سود فاکتور خوش‌بینانه دیده می‌شود.</div>
+</div>
+
+<div class="card">
+<div class="q">۲) فاکتور و سند حسابداری دو موجودیت جدا هستند؟</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — بله: <code>Invoice</code> و <code>JournalEntry</code> دو جدول جدا‌اند (<code>models.py:240</code> و <code>models.py:94</code>) و با <code>Invoice.entry_id</code> به سند صدور وصل می‌شوند.</p>
+<p><b>چند سند برای یک فاکتور؟</b> بله، در عمل: سند صدور + به‌ازای هر لغو جزئی تا ۳ سند جدید (برگشت فروش، جریمه مشتری، تأمین) که شناسه‌شان روی <code>InvoicePartialCancel</code> نگه داشته می‌شود + سند معکوس هنگام ابطال کل فاکتور (<code>reverse_entry</code>). خود <code>Invoice.entry_id</code> فقط سند اول را نشان می‌دهد؛ بقیه از مسیر رکوردهای لغو ردیابی می‌شوند.</p>
+</div>
+
+<div class="card">
+<div class="q">۳) حساب‌های مشتری/تأمین/صندوق/بانک، دفتر کل و تفصیلی؟</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — کدینگ چهارسطحی (<code>Account.level: group→general→subsidiary→detail</code>، <code>models.py:68</code>). هر شخص هنگام ساخت، یک حساب تفصیلی اختصاصی می‌گیرد (<code>Party.account_id</code>؛ مشتری زیر <code>1103</code>، تأمین زیر <code>2101</code>) و همه‌ی اسناد با همان تفصیلی ثبت می‌شوند — یعنی دفتر معین هر شخص همان گردش حساب تفصیلی اوست.</p>
+<p><b>گزارش‌های موجود:</b> دفتر روزنامه/کل (<code>services.ledger:651</code>)، تراز ۲/۴/۶ ستونی (<code>trial_balance:449</code>، <code>_4:495</code>، <code>_6:528</code>)، گردش حساب و خلاصه/گروه (<code>api:714/734/750</code>)، خزانه (<code>:768</code>)، مطالبات (<code>:778</code>)، سود و زیان (<code>statements.income_statement:61</code> — ردیفی به‌ازای هر حساب)، ترازنامه، جریان نقد و گزارش مالیات (<code>api:2652</code>).</p>
+<div class="note">حساب‌های سیستمی در <code>app/rules.py:15</code> نگاشت شده‌اند: ۱۱۰۱ صندوق، ۱۱۰۲۰۱ بانک، ۱۱۰۴ چک دریافتی، ۲۱۰۲ چک پرداختی، ۲۱۰۸ تسویه امانی ایرلاین، ۴۱۰۱/۴۱۰۲/۴۱۰۳ درآمد تور/بلیت/سایر، ۴۱۰۴ برگشت از فروش (تعریف‌شده ولی در لغو جزئی استفاده نمی‌شود)، ۴۱۰۵ کمیسیون، ۴۱۰۷/۴۱۰۸ جریمه مشتری/تأمین، ۵۱۰۱ بهای خدمات.</div>
+</div>
+
+<div class="card">
+<div class="q">۴) پرداخت/دریافت جزئی و مانده‌حساب؟</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — <code>Settlement</code> (وضعیت <code>draft|issued|cancelled</code>، روش‌های نقد/بانک/کارت/چک/انتقال) + <code>SettlementAllocation</code> برای تخصیص جزئی به چند فاکتور. تخصیص به روش <b>FIFO</b> (قدیمی‌ترین سررسید باز) یا <b>هدفمند</b> (<code>target_invoice_id</code> — اصلاح اخیر دکمه‌ی «دریافت پول»). مانده هر فاکتور <code>= total − paid</code> و <code>paid_rial</code> همیشه از روی مجموع تخصیص‌ها بازمحاسبه می‌شود. سپرده‌ی آزاد و تخصیص دستی سپرده هم هست (<code>sales.allocate_deposit ~1127</code>).</p>
+</div>
+
+<h2>بخش دوم — ساختار بلیت و رزرو هتل</h2>
+
+<div class="card">
+<div class="q">۵) ساختار داده‌ای بلیت/هتل؟ چند مسافر/مسیر/اتاق/شب؟</div>
+<p><span class="badge mid">ناقص</span> — موجودیت مستقل «بلیت» یا «رزرو» <b>وجود ندارد</b>؛ همه‌چیز ردیف فاکتور است (<code>InvoiceLine</code>). یک فاکتور می‌تواند چند ردیف داشته باشد (چند بلیت، بلیت+هتل+ترانسفر…). برای بلیت فقط <code>flight_type</code> (۱ داخلی / ۲ خارجی) و <code>qty</code> ساختاری است.</p>
+<p><b>مسافر، مسیر پرواز، PNR، تاریخ ورود/خروج، نوع اتاق و تعداد شب ستون ندارند</b> و در <code>description</code> ردیف نگاشته می‌شوند.</p>
+<div class="risk"><b>ریسک:</b> هر کنترل/محاسبه/لغویی که به «نفر»، «مسیر» یا «شب» نیاز داشته باشد، در داده ساختاری نیست.</div>
+</div>
+
+<div class="card">
+<div class="q">۶) لغو جزئی در مدل فعلی دقیقاً چیست؟</div>
+<p><span class="badge mid">ناقص (مبلغ‌محور)</span> — لغو جزئی فقط یک <b>مبلغ ریالی در سطح کل فاکتور</b> است (<code>partial_cancel_invoice، sales.py:640</code>)؛ به ردیف، مسافر، مسیر، اتاق یا شب متصل نمی‌شود. «لغو یک مسافر از تور ۴ نفره» یعنی اپراتور خودش مبلغ معادل را حساب کرده وارد می‌کند؛ <code>qty</code> ردیف کم نمی‌شود. حساب برگشت نیز از روی <b>ردیف اول</b> فاکتور (<code>inv.lines[0]</code>) تعیین می‌شود — برای فاکتور چندخدمته محدودیت است.</p>
+</div>
+
+<div class="card">
+<div class="q">۷) قیمت خرید/فروش/کمیسیون/تخفیف هر ردیف جداگانه؟</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — هر ردیف: <code>unit_price</code> (فروش)، <code>discount</code>، <code>purchase_cost_rial</code> (خرید از تأمین)، <code>revenue_model</code> (<code>gross|commission</code>)، <code>supplier_party_id</code>، <code>net/vat/rate_bp</code>. «هزینه‌های جانبی» فیلد جدا ندارد (به‌صورت ردیف مجزا ثبت می‌شود).</p>
+<p>مثال: بلیت ۱۰ فروش + خرید ۹، مدل commission → در صدور فقط ۱ به <code>4105</code> و ۹ به <code>2108</code> می‌رود. در مدل gross چهاردهم: کل ۱۰ درآمد <code>4102</code> و خرید از مسیر قبض تأمین به <code>5101</code>.</p>
+<div class="risk"><b>نکته:</b> در مدل gross فیلد <code>purchase_cost</code> صرفاً اطلاعاتی است و در سند صدور اثر ندارد.</div>
+</div>
+
+<h2>بخش سوم — منطق لغو و جریمه</h2>
+
+<div class="card">
+<div class="q">۸) فیلدهای فرم و فرمول‌های دقیق فعلی</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — فرم: <code>app.js:3167</code>، مدل ورودی <code>PartialCancelIn (api.py:1436)</code>، جدول <code>InvoicePartialCancel (models.py:733)</code>.</p>
+<table>
+<tr><th>فیلد ورودی کاربر</th><th>نقش</th><th>محدودیت</th></tr>
+<tr><td>amount (مبلغ لغو)</td><td>برگشت درآمد</td><td>۰ &lt; amount ≤ قابل‌لغو</td></tr>
+<tr><td>reason (دلیل)</td><td>شرح و کلید یکتایی</td><td>حداقل ۸ نویسه</td></tr>
+<tr><td>date</td><td>تاریخ سندها</td><td>پیش‌فرض امروز</td></tr>
+<tr><td>penalty_customer</td><td>جریمه مشتری → <code>4107</code></td><td>≤ amount</td></tr>
+<tr><td>supplier_refund</td><td>برگشت از تأمین → کاهش <code>5101</code></td><td>≥ ۰ (سقف دیگری ندارد)</td></tr>
+<tr><td>supplier_refund_vat</td><td>برگشت مالیات خرید → <code>1107</code></td><td>≤ supplier_refund</td></tr>
+<tr><td>penalty_supplier</td><td>جریمه <b>دریافتی</b> از تأمین → <code>4108</code></td><td>≥ ۰</td></tr>
+<tr><td>supplier_id</td><td>تفصیلی تأمین؛ خالی=حدس از ردیف‌ها</td><td>—</td></tr>
+</table>
+<p><b>فرمول‌ها (محاسباتی سیستم):</b></p>
+<div class="entry">cancellable           = invoice.total_rial − Σ(partial_cancels قبلی)     → amount باید ≤ این
+refund_to_customer    = amount − penalty_customer                     (استرداد از بانک)
+supplier_net_expense  = supplier_refund − supplier_refund_vat
+claim_from_supplier   = supplier_refund + penalty_supplier            (بدهکار شدن حساب تأمین)</div>
+<p>هیچ محاسبه‌ی درصدی/قانون‌محور خودکار وجود ندارد؛ همه‌ی اعداد را اپراتور وارد می‌کند.</p>
+</div>
+
+<div class="card">
+<div class="q">۹) تفاوت پنج مبلغ کلیدی — ورودی یا محاسباتی؟</div>
+<table>
+<tr><th>مبلغ</th><th>ورودی/محاسباتی</th><th>اثر دفتری</th></tr>
+<tr><td>مبلغ لغو</td><td>ورودی</td><td>کاهش درآمد خدمت (۴۱۰x)</td></tr>
+<tr><td>جریمه مشتری</td><td>ورودی</td><td>درآمد جریمه ۴۱۰۷ + طلب از مشتری</td></tr>
+<tr><td>جریمه تأمین‌کننده</td><td>ورودی</td><td>درآمد جریمه ۴۱۰۸ + طلب از تأمین ⚠️ جهت «دریافتی از تأمین» است، نه پرداختی</td></tr>
+<tr><td>قابل استرداد از تأمین</td><td>ورودی (supplier_refund)</td><td>کاهش هزینه ۵۱۰۱ + طلب از تأمین</td></tr>
+<tr><td>قابل استرداد به مشتری</td><td><b>محاسباتی</b> = لغو − جریمه مشتری</td><td>خروج خودکار از بانک/صندوق</td></tr>
+</table>
+</div>
+
+<div class="card">
+<div class="q">۱۰) برابری جریمه مشتری و تأمین فرض شده؟ کارمزد کنسلی، هزینه غیرقابل‌استرداد، اختلاف خرید/فروش؟</div>
+<p><span class="badge mid">جزئی</span></p>
+<ul>
+<li>برابری دو جریمه فرض <b>نمی‌شود</b> (کاملاً مستقل؛ در سناریوی اجراشده ۵ ≠ ۳).</li>
+<li>کارمزد کنسلی آژانس = همان «جریمه مشتری» (۴۱۰۷) یا اختلاف ضمنی لغو با برگشت تأمین.</li>
+<li><b>هزینه‌ی غیرقابل‌استرداد صریح نیست</b> — هر بخشی از هزینه که در «برگشت تأمین» نیاید، خودکار در <code>5101</code> می‌ماند (مثال: هزینه ۱۰۰، ایرلاین ۲۰ برمی‌گرداند → ۸۰ هزینه در ۵۱۰۱ می‌ماند). خط جدای «هزینه‌ی جریمه‌ی خرید» در سود و زیان دیده نمی‌شود.</li>
+<li>اختلاف خرید و فروش: از دو مسیر مستقل (لغو از فروش کم می‌کند، برگشت از هزینه)؛ <b>هیچ سقف/نسبتی بین آن‌ها چک نمی‌شود</b> — می‌توان supplier_refund را بیش از هزینه‌ی واقعی آن بخش وارد کرد.</li>
+</ul>
+<div class="risk"><b>ریسک:</b> خطای اپراتور در برگشت تأمین، سود را جابه‌جا می‌کند و هیچ کنترل متقاطعی نیست.</div>
+</div>
+
+<div class="card">
+<div class="q">۱۱) قوانین کنسلی بلیت و هتل جداگانه؟ بر اساس قوانین تأمین؟</div>
+<p><span class="badge no">پیاده‌سازی نشده</span> — هیچ جدول/موتور قاعده‌ی کنسلی (برنامه‌ی ایرلاین، درصد بر اساس فاصله تا پرواز، سیاست هتل/اتاق، تعطیل/غیرتعطیل) وجود ندارد؛ بلیت و هتل قانون جدا ندارند و همه‌ی اعداد دستی‌اند.</p>
+</div>
+
+<div class="card">
+<div class="q">۱۲) پس از لغو جزئی چه چیزهایی اصلاح می‌شود و چه چیزهایی حفظ؟</div>
+<ul>
+<li><code>total_rial</code> فاکتور <b>تغییر نمی‌کند</b>؛ کاهش درآمد فقط در دفاتر و توسط سند برگشت اعمال می‌شود (نمونه: فاکتور همچنان ۶۰ نشان می‌دهد ولی درآمد دفتر ۳۵ است).</li>
+<li><code>paid_rial</code> با آزادسازی تخصیص‌ها از ابتدای صف و بازمحاسبه‌ی گروهی (<code>paid = Σ allocations</code>) اصلاح می‌شود (<code>sales.py:709-731</code>).</li>
+<li><b>ردیف‌ها و مبالغ اولیه کامل حفظ می‌شوند</b> — <code>invoice_lines</code> هیچ تغییری نمی‌کند و ستون «لغوشده» ندارد؛ سوابق لغو در جدول <code>invoice_partial_cancels</code> است.</li>
+</ul>
+<div class="risk"><b>ریسک گزارش‌دهی (مستندشده در سناریو):</b> ستون «مانده» لیست فاکتور = total − paid و پس از لغو، با «ارزش واقعی خدمت باقی‌مانده» (= total − Σلغوها − تسویه‌ها) فرق می‌کند؛ تفسیر مانده پس از لغو نیازمند آگاهی کاربر است.</div>
+</div>
+
+<h2>بخش چهارم — اسناد حسابداری و گردش وجه</h2>
+
+<div class="card">
+<div class="q">۱۳) رکوردها و اسناد هنگام لغو — با مثال عددی</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — مثال واقعی سناریوی اجراشده: فاکتور A1 به مبلغ ۶۰ (کاملاً دریافت‌شده)، لغو ۲۵، جریمه مشتری ۵، برگشت تأمین ۲۰، جریمه تأمین ۳:</p>
+<div class="entry">۱) سند برگشت فروش (entry_id):
+   Dr 4101 درآمد تور ........ 25      Cr 1103 مشتری ........ 25
+۲) سند جریمه مشتری (penalty_entry_id):
+   Dr 1103 مشتری ............ 5       Cr 4107 جریمه مشتری ... 5
+۳) پرداخت استرداد — خودکار (refund_id → Settlement issued):
+   Dr 1103 مشتری ............ 20      Cr 110201 بانک ......... 20
+۴) سند برگشت تأمین (supplier_refund_entry_id):
+   Dr 2101 تأمین ............ 20      Cr 5101 بهای خدمات ..... 20
+   (اگر supplier_refund_vat&gt;0: Cr 1107 به میزان مالیات و Cr 5101 به خالص)
+۵) سند جریمه تأمین (supplier_penalty_entry_id):
+   Dr 2101 تأمین ............ 3       Cr 4108 جریمه تأمین .... 3
++ رکورد InvoicePartialCancel با ۵ اشاره‌گر سند + reason/date/کاربر</div>
+<p>اثر خالص روی مشتری: ۶۰(بدهی) − ۲۵(لغو) − ۲۰(استرداد) + ۵(جریمه) و از طرف دیگر ۶۰ دریافت − ۲۰ استرداد ⇒ مانده صفر. اثر روی تأمین: ۲۰+۳=۲۳ بدهکار (طلب آژانس).</p>
+</div>
+
+<div class="card">
+<div class="q">۱۴) آیا ثبت لغو خودکار به معنای جابه‌جایی وجه است؟</div>
+<p><b>به مشتری: بله</b> <span class="badge mid">خودکار و فوری</span> — همان لحظه یک Settlement پرداختِ صادرشده (<code>create_settlement(out, issue=True)</code>، <code>sales.py:756-768</code>) ساخته و سند خروج بانک می‌خورد. یعنی سیستم فرض می‌کند پول «همین الان» به مشتری پرداخت شد؛ حالت «استرداد ثبت‌شده ولی هنوز پرداخت‌نشده» وجود ندارد.</p>
+<p><b>از تأمین‌کننده: خیر</b> — فقط حساب تفصیلی تأمین بدهکار می‌شود (طلب)؛ هیچ دریافت نقدی ثبت نمی‌شود (و مسیر Settlement جهت «in» برای تأمین ولیدیشن customer دارد و بسته است — وصول با سند روزنامه‌ی دستی انجام می‌شود).</p>
+<div class="risk"><b>ریسک:</b> (الف) جریان نقد واقعی با ثبت سیستم ممکن است از هم جدا شود؛ (ب) هیچ کنترلی «استرداد ≤ خالص دریافتی از همین فاکتور» نیست — تصمیم باز ممیزی.</div>
+</div>
+
+<div class="card">
+<div class="q">۱۵) طلب از تأمین و بدهی به مشتری پیش از جابه‌جایی وجه چگونه مدیریت می‌شود؟</div>
+<p><span class="badge mid">جزئی</span> — طلب از تأمین = مانده‌ی بدهکار تفصیلی تأمین در زیر <code>2101</code> (حسابی که طبیعتاً بستانکار است؛ بدهکار شدنش یعنی طلب) و در دفتر معین همان شخص قابل ردیابی است، اما در گزارش «مطالبات» (<code>api:778</code>) به‌صورت گروه مجزا دیده نمی‌شود. بدهی به مشتری: چون استرداد فوری است، حالت ماندگار پیش‌نمی‌آید؛ اگر مشتری پولی نداده باشد، بستانکار شدن حسابش عملاً نقش پیش‌دریافت/بستانکاری را دارد.</p>
+</div>
+
+<div class="card">
+<div class="q">۱۶) وضعیت‌های جریان کار («در انتظار تأیید»، «در انتظار استرداد»…)؟</div>
+<p><span class="badge no">پیاده‌سازی نشده</span> — <code>InvoicePartialCancel</code> ستون وضعیت ندارد؛ هر عملیات اتمیک و همان لحظه نهایی می‌شود. تنها وضعیت‌های موجود: فاکتور و تسویه (<code>draft|issued|cancelled</code>) و چک.</p>
+</div>
+
+<div class="card">
+<div class="q">۱۷) ابطال/اصلاح یک لغو‌ی ثبت‌شده و جلوگیری از تکرار؟</div>
+<p><b>ابطال لغو:</b> <span class="badge no">مسیر رسمی ندارد</span> — کاربر باید تک‌تک اسناد را دستی معکوس کند (<code>reverse_entry</code> عمومی است)؛ این کار رکورد pc و تخصیص‌های آزادشده را بازنمی‌گرداند و احتمال ناسازگاری دارد.</p>
+<p><b>جلوگیری از تکرار:</b> <span class="badge ok">پیاده‌سازی شده</span> — <code>UniqueConstraint uq_partial_once (invoice_id, doc_date, amount, reason)</code> + چک صریح «قبلاً ثبت شده» + <code>Idempotency-Key</code> روی API (پاسخ تکراری بدون رکورد جدید؛ بدنه‌ی متفاوت با همان کلید ⇒ <code>409</code>) + <code>source_ref</code> یکتای اسناد + قفل per-invoice و <code>with_for_update</code> (هر سه در سناریو با تست دو رشته‌ای اثبات شد).</p>
+</div>
+
+<h2>بخش پنجم — کنترل‌ها و گزارش‌ها</h2>
+
+<div class="card">
+<div class="q">۱۸) اتصال به فاکتور اصلی و امکان چند لغو در زمان‌های مختلف؟</div>
+<p><span class="badge ok">پیاده‌سازی شده</span> — اتصال با <code>InvoicePartialCancel.invoice_id</code>، شماره‌ی فاکتور در شرح همه‌ی اسناد، و <code>source_ref=partial-cancel-{id}</code>. چند لغو در زمان‌های مختلف برای یک فاکتور مجاز است (در سناریو سه لغو موفق) و سقف تجمیعی با قاعده‌ی «قابل‌لغو» کنترل می‌شود. اتصال به «شناسه‌ی دقیق بلیت/رزرو» چون آن موجودیت‌ها وجود ندارند، در سطح فاکتور است نه ردیف.</p>
+</div>
+
+<div class="card">
+<div class="q">۱۹) گزارش‌های جریمه/طلب/بدهی/سود لغو؟</div>
+<p><span class="badge mid">جزئی</span></p>
+<ul>
+<li><b>حساب‌های مجزا</b> ۴۱۰۷ (جریمه مشتری) و ۴۱۰۸ (جریمه تأمین) ⇒ در سود و زیان (ردیفی به‌ازای هر حساب)، تراز ۲/۴/۶ ستونی و دفتر کل، خط مستقل دارند.</li>
+<li>تاریخچه‌ی لغوهای هر فاکتور با شناسه‌ی اسناد: <code>GET /api/invoices/{id}/partial-cancels</code>.</li>
+<li><b>ندارد:</b> گزارش تحلیلی مجتمع لغوها — لیست جریمه‌های مشتری در مقابل تأمین، طلب باز از تأمین‌کنندگان به تفکیک، سود/زیان هر عملیات لغو، تفکیک بلیت/هتل، و گزارش مستقیم «طلب از تأمین‌کنندگان» در مطالبات.</li>
+</ul>
+</div>
+
+<div class="card">
+<div class="q">۲۰) محدودیت‌های اعمال‌شده برای جلوگیری از خطاها</div>
+<table>
+<tr><th>کنترل</th><th>وضعیت</th></tr>
+<tr><td>لغو ≤ قابل‌لغو (= total − Σلغوها) — بازبینی داخل تراکنش و بعد از قفل</td><td><span class="badge ok">✓</span></td></tr>
+<tr><td>جریمه مشتری ≤ مبلغ لغو؛ همه‌ی مبالغ ≥ ۰؛ مالیات برگشت ≤ برگشت تأمین؛ مالیات بدون برگشت ممنوع</td><td><span class="badge ok">✓</span></td></tr>
+<tr><td>فقط فاکتور «صادرشده»؛ دلیل ≥ ۸ نویسه</td><td><span class="badge ok">✓</span></td></tr>
+<tr><td>ضدتکرار: محدودیت یکتا + Idempotency-Key + قفل هم‌زمانی (رشته‌ای + ردیفی)</td><td><span class="badge ok">✓</span></td></tr>
+<tr><td>دوره‌ی بسته: رد + رول‌بک کامل تراکنش (اثبات‌شده در سناریو)</td><td><span class="badge ok">✓</span></td></tr>
+<tr><td>مجوزها: <code>journal.reverse</code> برای دکمه، <code>journal.create</code> برای API</td><td><span class="badge ok">✓</span></td></tr>
+<tr><td>سقف برگشت تأمین بر هزینه‌ی واقعی همان بخش</td><td><span class="badge no">✗</span></td></tr>
+<tr><td>استرداد ≤ خالص دریافتی از همان فاکتور</td><td><span class="badge no">✗</span> (تصمیم باز)</td></tr>
+<tr><td>کنترل تعداد (نفر/اتاق/شب) و اتصال لغو به ردیف</td><td><span class="badge no">✗</span></td></tr>
+<tr><td>کنترل لغو روی فاکتوری که صورتحساب مودیانش ارسال/پذیرفته شده</td><td><span class="badge no">✗</span> ⚠️</td></tr>
+</table>
+</div>
+
+<h2>جمع‌بندی معماری فعلی (نقشه‌ی یک‌نگاه)</h2>
+<div class="card">
+<p><b>مدل ذهنی سیستم:</b> «فاکتور، بوم‌رنگِ دفاتر است» — مبلغ اولیه همیشه دست‌نخورده می‌ماند و هر تغییری (لغو، جریمه، برگشت، استرداد) با <b>اسناد جدید و اتمیک</b> اعمال می‌شود. لغو جزئی <b>مبلغ‌محور در سطح فاکتور</b> است، سه دسته پول را هم‌زمان تسویه می‌کند (مشتری، تأمین، دفاتر درآمد/هزینه)، استرداد مشتری را فوری و نقدی ثبت می‌کند و طلب از تأمین را فقط حسابداری (غیرنقدی). قدرت‌ها: یکپارچگی دوطرفه، ضدتکرار، ضد‌هم‌زمانی، حساب‌های مجزای جریمه. ضعف‌ها: فقدان موجودیت بلیت/رزرو و لغو در سطح نفر/ردیف، فقدان قوانین کنسلی، فقدان workflow حالت، فقدان ابطال رسمی لغو، و چند کنترل متقاطع مالی.</p>
+</div>
+
+<h2>مواردی که برای پاسخ قطعی به بررسی/تصمیم بیشتر نیاز دارند</h2>
+<div class="card">
+<ol>
+<li><b>تعامل با سامانه مودیان ⚠️:</b> در کد <code>partial_cancel_invoice</code> هیچ اشاره‌ای به <code>MoadianInvoice</code> نیست؛ برای فاکتوری که صورتحساب الکترونیکی‌اش «ارسال/پذیرفته» شده، لغو جزئی درآمد را در دفاتر کم می‌کند بدون هیچ اقدام مالیاتی — باید با حسابدار تصمیم گرفته شود (ممنوعیت، یا صدور صورتحساب ابطالی/اصلاحی).</li>
+<li><b>مدل revenue_model=commission در لغو:</b> سند برگشت به حساب درآمد بلیت (۴۱۰۲) می‌زند نه ترکیب کمیسیون/امانی ایرلاین — برای فاکتورهای کمیسیونی احتمال ناسازگاری؛ نیاز به تصمیم طراحی.</li>
+<li><b>حساب ۴۱۰۴ «برگشت از فروش»</b> در کدینگ هست ولی لغو جزئی از درآمد اصلی کم می‌کند — انتخاب سیاست گزارش‌دهی با حسابدار.</li>
+<li><b>نمایش طلب از تأمین‌کنندگان در گزارش مطالبات</b> (فعلاً فقط در معین تأمین مستتر است).</li>
+<li><b>سقف supplier_refund بر هزینه‌ی واقعی</b> و <b>سقف استرداد بر خالص دریافتی</b> — دو تصمیم کنترلی باز.</li>
+<li><b>استراتژی ابطال لغو‌ی ثبت‌شده</b> (سند معکوس زنجیره‌ای + برگشت تخصیص‌ها) در صورت نیاز.</li>
+</ol>
+<p class="meta">پایان گزارش — تهیه‌شده صرفاً از روی کد خوانده‌شده؛ موارد نامشخص صریحاً علامت «پیاده‌سازی نشده» گرفته‌اند و حدس زده نشده‌اند.</p>
+</div>
+
+</div></body></html>

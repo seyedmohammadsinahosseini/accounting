@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  accounting-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: accounting-platform
+    ports:
+      - "8000:8000"
+    environment:
+      - ACCT_DEMO_SEED=1
+      - ACCT_ENABLE_DOCS=1
+      - ACCT_SESSION_HOURS=12
+      - ACCT_BACKUP_ENABLED=1
+      - ACCT_BACKUP_EVERY_HOURS=24
+      - ACCT_BACKUP_KEEP=30
+      - ACCT_RATE_LOGIN=10
+      - ACCT_RATE_API=240
+    volumes:
+      - platform_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  platform_data:
+    driver: local

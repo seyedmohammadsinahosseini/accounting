@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+data/accounting.db*
+data/backups/*
+data/logs/*
+data/DEMO-credentials.txt
+data/secret.key
+htmlcov
+.coverage

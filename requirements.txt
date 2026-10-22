@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+openpyxl
+python-multipart
+pytest
+httpx
+cryptography

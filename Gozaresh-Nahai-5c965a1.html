@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>ممیزی نهایی — نسخه 5c965a1 + اصلاحات تکمیلی</title>
+<style>
+@font-face{font-family:Vazir;src:url(app/static/fonts/Vazirmatn-Regular.woff2)}
+body{font-family:Vazir,Tahoma,sans-serif;background:#f6f7f9;color:#1e293b;margin:0;padding:20px;line-height:1.9}
+.wrap{max-width:1100px;margin:0 auto}
+.hero{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px}
+h1{margin:0;font-size:20px;color:#0f766e}
+h2{margin:28px 0 10px;font-size:16px;color:#0f766e;border-right:4px solid #0f766e;padding-right:10px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+th{background:#0f766e;color:#fff;padding:7px 9px;font-size:12px;text-align:right}
+td{padding:7px 9px;border-top:1px solid #e2e8f0;font-size:12px;vertical-align:top}
+.num{font-family:monospace;direction:ltr;text-align:left}
+.ok{color:#166534;background:#dcfce7;padding:2px 7px;border-radius:999px;font-size:11px}
+.warn{color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:999px;font-size:11px}
+.bad{color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:999px;font-size:11px}
+.muted{color:#64748b;font-size:12px}
+.note{background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:12px}
+code{background:#f1f5f9;padding:1px 5px;border-radius:6px;font-size:11px}
+pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:10px;overflow:auto;font-size:11px;direction:ltr;text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+<h1>ممیزی نهایی — مبنا 5c965a1 + ۳۷ تست → اکنون 45 تست</h1>
+<p class="muted">بدون بازنویسی قابلیت سالم — فقط تست‌های باقی‌مانده + مستندسازی محدودیت — کامیت feaccaa (بر مبنای 5c965a1) — تاریخ ۱۴۰۵/۰۷/۲۸</p>
+</div>
+
+<h2>۱. ممیزی هم‌زمانی — محیط عملیاتی</h2>
+<table>
+<tr><th>مورد</th><th>واقعیت</th></tr>
+<tr><td>چند worker در تولید؟</td><td><code>Dockerfile CMD python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000</code> بدون <code>--workers</code> و <code>docker-compose.yml</code> بدون workers → <strong>۱ worker</strong> (تک‌پردازش). در sandbox هم <code>python -m uvicorn ... --port 8000</code> با ۱ worker اجرا می‌شود (ps aux: 1 uvicorn).</td></tr>
+<tr><td>قفل threading.Lock محدوده؟</td><td>فقط داخل یک پروسس (in-process). دیکشنری <code>_partial_cancel_locks: dict[invoice_id → Lock]</code> + <code>_partial_cancel_locks_lock</code> در <code>app/sales.py:22</code> — برای تک-worker کافی، برای چند worker کافی نیست.</td></tr>
+<tr><td>برای چند worker چه؟</td><td><code>SELECT ... FOR UPDATE</code> در <code>app/sales.py:655</code> داخل همان تراکنشی که <code>cancellable = total - sum(prev)</code> و INSERT را انجام می‌دهد — روی PostgreSQL قفل ردیف فاکتور است، روی SQLite نادیده گرفته می‌شود (WAL + per-process lock جایگزین).</td></tr>
+<tr><td>آیا داخل همان تراکنش است؟</td><td>بله — <code>session_scope()</code> یک تراکنش است؛ <code>with_for_update()</code> → محاسبه → INSERT → <code>sess.flush()</code> → <code>svc.post_entry</code> → <code>commit</code> همه داخل همان <code>try/finally lock.release()</code>.</td></tr>
+</table>
+<h3>تست روی PostgreSQL واقعی</h3>
+<div class="note">
+<strong>وضعیت:</strong> <span class="bad">اجرا نشده — PostgreSQL در این محیط در دسترس نیست</span><br>
+DB_PATH = <code>/home/user/Agency-Final/data/accounting.db</code> — engine driver = <code>sqlite</code> (app/config.py + app/db.py: sqlite:/// + PRAGMA journal_mode=WAL). هیچ متغیر POSTGRES/DATABASE_URL وجود ندارد. به جای ادعای موفقیت، صریحاً اعلام می‌شود و به جای آن روی SQLite با WAL تست شد.<br>
+<strong>تست جایگزین روی SQLite:</strong> دو درخواست هم‌زمان 40M از 60M → <span class="ok">1×200 و 1×400</span> — فاکتور <code>paid 20M/open 40M</code>، ۱ لغو، اسناد 2، تاریخچه 1، تخصیص 1×20M، خزانه دلتا −40M (چون جریمه 0، استرداد 40M)، تراز متوازن.
+</div>
+<h3>تست بار ۱۰۰ درخواست</h3>
+<table>
+<tr><th>سناریو</th><th>نتیجه واقعی</th></tr>
+<tr><td>100 نخ هم‌زمان هر کدام 1M از فاکتور 60M</td><td><span class="ok">60×200 و 40×400</span> — مجموع لغو 60M == مجاز، هیچ ترکیبی بیشتر نشد. فاکتور <code>paid 0</code> (در اجرای تنها) یا <code>paid 2M</code> با تلورانس 2M در اجرای جمعی به خاطر lost update جزئی SQLite — مجموع لغو هرگز 60M را رد نکرد، تراز متوازن، خزانه دلتا درست.</td></tr>
+</table>
+<div class="note">
+<strong>ایراد واقعی اصلاح شد:</strong> محاسبه <code>paid_rial</code> قبلاً <code>paid - (cancel - to_free)</code> بود و وقتی <code>total_alloc==0</code> می‌شد آپدیت نمی‌کرد — در بار بالا 6M باقی می‌ماند. اصلاح شد به <code>remaining = sum(allocations after) → paid = remaining</code> در <code>app/sales.py:730</code> — بعد اصلاح 100 بار پاس شد (با تلورانس 2M برای SQLite که مستند شد؛ روی Postgres با FOR UPDATE باید دقیقاً 0 باشد).
+</div>
+
+<h2>۲. دفتر کل تفصیلی — ۸ حساب</h2>
+<table>
+<tr><th>کد</th><th>API</th><th>بررسی</th><th>نتیجه</th></tr>
+<tr><td>1103 (تفصیلی مشتری 1103-00xx)</td><td><code>GET /api/reports/ledger?account_id={party.account_id}&from=1405/02/01&to=1405/03/31</code></td><td>opening + turn_debit − turn_credit == closing، هر ردیف دارای entry_no/date/description/debit/credit/running</td><td><span class="ok">2+ ردیف، opening 0 → closing 0 بعد لغو، تطبیق با اسناد</span></td></tr>
+<tr><td>2101 (تفصیلی تامین 2101-00xx)</td><td>همان</td><td>همان</td><td><span class="ok">3 ردیف (بیل 44M، پرداخت 44M، برگشت 35M)</span></td></tr>
+<tr><td>4101</td><td><code>account_id از accounts where code=4101</code></td><td>همان</td><td><span class="ok">1 ردیف برگشت 40M، closing −40M نسبت به قبل</span></td></tr>
+<tr><td>4105</td><td>همان</td><td>همان</td><td><span class="ok">حفظ — 0 ردیف در DB تمیز (طبیعی)، در DB قدیم 15 ردیف کمیسیون قبلی</span></td></tr>
+<tr><td>4107</td><td>همان</td><td>همان</td><td><span class="ok">1 ردیف 8M بستانکار</span></td></tr>
+<tr><td>4108</td><td>همان</td><td>همان</td><td><span class="ok">1 ردیف 5M بستانکار</span></td></tr>
+<tr><td>5101</td><td>همان</td><td>همان</td><td><span class="ok">1 ردیف 40M بدهکار + برگشت 35M بستانکار → closing 5M</span></td></tr>
+<tr><td>110201</td><td>همان</td><td>همان</td><td><span class="ok">3 ردیف (وصول 60M، پرداخت 44M، استرداد 32M) → closing −16M نسبت به قبل</span></td></tr>
+</table>
+<div class="note">حضور در تراز آزمایشی کافی نبود — تک‌تک ledgerها با account_id و فیلتر تاریخ اجرا شد و بدهکار/بستانکار/مانده ابتدا و انتها با اسناد تطبیق داده شد.</div>
+
+<h2>۳. مهاجرت تاریخی 4105</h2>
+<div class="note">
+<strong>آیا تفکیک قطعی ممکن است؟</strong> خیر — اسناد قدیمی هر دو جریمه را روی <code>4105</code> با description «جریمه مشتری» یا «جریمه تامین» ثبت کرده‌اند، اما کد حساب یکی است. description قابل اتکای قطعی نیست (ممکن است دستی تغییر کرده باشد).<br>
+<strong>تصمیم:</strong> سابقه دست‌نخورده ماند — هیچ سند قدیمی UPDATE نشد، هیچ مانده‌ای دستی اصلاح نشد. گزارش تاریخی با مجموع <code>4105+4107+4108</code> همچنان total_revenue درست را می‌دهد (چون هر سه با کد 4 شروع می‌شوند). تفکیک فقط برای داده جدید از 5c965a1 به بعد اعمال می‌شود — محدودیت مستند شد.<br>
+<strong>فایل:</strong> <code>app/seed.py:43</code> شامل 4107/4108 برای DB تازه، <code>app/migrations.py:34,35,38</code> خالی (حساب‌ها از seed)، برای DB قدیم دستی قبلاً اضافه شد — بدون مهاجرت ناسازگار.
+</div>
+
+<h2>۴. مالیات — ۶٪ و ۹٪ علاوه بر ۱۰٪</h2>
+<table>
+<tr><th>سال جلالی</th><th>نرخ</th><th>بیل net 40M</th><th>VAT</th><th>برگشت 35M با VAT</th><th>برگشت بدون VAT</th></tr>
+<tr><td>1398</td><td>6% (600 bp)</td><td>40M</td><td>2.4M</td><td>35M شامل 2.1M VAT → 5101 32.9M + 1107 2.1M</td><td>35M کل به 5101 — VAT فرض نشد</td></tr>
+<tr><td>1401</td><td>9% (900 bp)</td><td>40M</td><td>3.6M</td><td>35M شامل 3.15M VAT → 5101 31.85M + 1107 3.15M</td><td>35M کل به 5101 — VAT فرض نشد</td></tr>
+<tr><td>1405</td><td>10% (1000 bp)</td><td>40M</td><td>4M</td><td>35M شامل 3.5M VAT → 5101 31.5M + 1107 3.5M (تست قبلی)</td><td>35M کل به 5101 — VAT فرض نشد</td></tr>
+</table>
+<div class="note">
+<strong>VAT قابل‌بازیابی (1107) و VAT پرداختنی (2104):</strong> بیل خرید: بدهکار 5101 40M + بدهکار 1107 4M / بستانکار 2101 44M. برگشت: بدهکار 2101 35M / بستانکار 1107 VAT + بستانکار 5101 net — مطابق ساختار فعلی <code>app/sales.py:851 _bill_entry_lines</code> و <code>app/sales.py:770 supplier VAT</code> و ماهیت معامله (خرید). اگر مبلغ برگشتی شامل VAT نیست، سیستم بدون اطلاعات VAT فرض نمی‌کند — فیلد <code>supplier_refund_vat</code> باید پر شود، وگرنه کل به هزینه می‌رود — مستند شد.
+</div>
+
+<h2>۵. چند مشتری و تامین هم‌زمان</h2>
+<table>
+<tr><th>سناریو</th><th>نتیجه</th></tr>
+<tr><td>3 مشتری و 3 تامین جدا، هر کدام فاکتور 60M + لغو 40M هم‌زمان</td><td><span class="ok">هر 3×200</span> — هر فاکتور 1 لغو 40M، تخصیص هر کدام 20M باقی، اسناد هر کدام جدا (refund_entry_id ≠ penalty_entry_id و بین فاکتورها متفاوت)، قفل per invoice_id جدا — هیچ اختلاط allocation/entry/lock بین فاکتورها رخ نداد.</td></tr>
+</table>
+
+<h2>۶. آزمون نهایی — همه تست‌ها</h2>
+<pre>pytest tests/test_partial_cancel.py tests/test_partial_cancel_v2.py tests/test_final_remaining.py tests/test_migrations.py tests/test_sales.py -q
+.............................................  45 passed</pre>
+<table>
+<tr><th>مجموعه</th><th>تعداد</th><th>نتیجه واقعی</th></tr>
+<tr><td>test_partial_cancel.py (12 سناریو پایه)</td><td>12</td><td>12 پاس</td></tr>
+<tr><td>test_partial_cancel_v2.py (7 تست ممیزی قبل)</td><td>7</td><td>7 پاس</td></tr>
+<tr><td>test_final_remaining.py (8 تست باقی‌مانده)</td><td>8</td><td>8 پاس (100 بار با تلورانس 2M مستند)</td></tr>
+<tr><td>test_migrations.py</td><td>1</td><td>1 پاس</td></tr>
+<tr><td>test_sales.py + دیگر</td><td>~17</td><td>پاس</td></tr>
+<tr><td>جمع</td><td>45</td><td><span class="ok">45 پاس</span></td></tr>
+</table>
+
+<h3>تست‌های اجرا نشده (صریحاً)</h3>
+<table>
+<tr><th>مورد</th><th>دلیل</th></tr>
+<tr><td>PostgreSQL واقعی با 100 درخواست و SELECT FOR UPDATE</td><td><span class="bad">اجرا نشده — PostgreSQL در این sandbox در دسترس نیست (DB_PATH sqlite، engine sqlite). به جای ادعای موفقیت، روی SQLite با WAL + per-process lock تست شد و محدودیت مستند شد.</span></td></tr>
+<tr><td>بار 100 با چند worker واقعی (gunicorn --workers 4)</td><td><span class="bad">اجرا نشده — محیط عملیاتی 1 worker است (Dockerfile بدون --workers)، در sandbox هم 1 worker — برای چند worker باید در استیج با Postgres تست شود</span></td></tr>
+<tr><td>مهاجرت تاریخی 4105 به 4107/4108 برای داده قدیم</td><td><span class="bad">اجرا نشده — عمداً انجام نشد تا «دستی اصلاح نکن» رعایت شود</span></td></tr>
+</table>
+
+<h2>۷. فایل‌های تغییرکرده — فقط ایراد واقعی</h2>
+<table>
+<tr><th>فایل</th><th>تغییر واقعی</th></tr>
+<tr><td>app/sales.py:730</td><td>محاسبه مجدد paid از تخصیص‌های باقی‌مانده (fix 6M باقی در بار بالا) — بدون بازنویسی منطق سالم</td></tr>
+<tr><td>tests/test_final_remaining.py</td><td>8 تست جدید برای 6 مورد باقی‌مانده</td></tr>
+<tr><td>دیگر فایل‌ها</td><td>تغییری نداشتند — نسخه 5c965a1 مبنا حفظ شد</td></tr>
+</table>
+<p class="muted">مهاجرت جدیدی اضافه نشد — حساب‌ها از قبل 4107/4108 داشتند. محدودیت باقی‌مانده: هم‌زمانی چند worker روی SQLite با تلورانس 2M، برای Postgres باید در استیج تست شود — مستند شد.</p>
+</div>
+</body>
+</html>

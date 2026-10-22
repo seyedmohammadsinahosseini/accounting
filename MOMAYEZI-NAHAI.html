@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>ممیزی نهایی واقعی — لغو جزئی ۴۰M</title>
+<style>
+  @font-face{font-family:Vazir;src:url(app/static/fonts/Vazirmatn-Regular.woff2)}
+  body{font-family:Vazir,Tahoma,sans-serif;background:#f6f7f9;color:#1e293b;margin:0;padding:20px;line-height:1.9}
+  .wrap{max-width:1050px;margin:0 auto}
+  .hero{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px}
+  h1{margin:0;font-size:20px;color:#0f766e}
+  h2{margin:28px 0 10px;font-size:17px;color:#0f766e;border-right:4px solid #0f766e;padding-right:10px}
+  h3{margin:16px 0 8px;font-size:14px}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+  th{background:#0f766e;color:#fff;padding:7px 9px;font-size:12px;text-align:right}
+  td{padding:7px 9px;border-top:1px solid #e2e8f0;font-size:12px;vertical-align:top}
+  .num{font-family:monospace;direction:ltr;text-align:left}
+  .ok{color:#166534;background:#dcfce7;padding:2px 7px;border-radius:999px;font-size:11px}
+  .bad{color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:999px;font-size:11px}
+  .warn{color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:999px;font-size:11px}
+  .muted{color:#64748b;font-size:12px}
+  .note{background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:6px;font-size:11px}
+  pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:10px;overflow:auto;font-size:11px;direction:ltr;text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+  <h1>ممیزی نهایی واقعی — لغو جزئی ۴۰M از فاکتور ۶۰M</h1>
+  <p class="muted">سناریو: سرمایه ۱۰۰M → فاکتور ۶۰M → تامین ۴۰M → دریافت ۶۰M → پرداخت ۴۰M → لغو ۴۰M (جریمه مشتری ۸M، برگشت تامین ۳۵M، جریمه تامین ۵M، استرداد ۳۲M) — تاریخ ممیزی ۱۴۰۵/۰۷/۲۸ — DB ایزوله واقعی + API — بدون تغییر عجولانه کد</p>
+  <p><span class="ok">اجرا شده با داده واقعی</span> <span class="bad">مغایرت جزئی</span> <span class="warn">اجرا نشده</span></p>
+</div>
+
+<h2>خلاصه اجرایی</h2>
+<table>
+<tr><th>مورد</th><th>نتیجه</th><th>توضیح کوتاه</th></tr>
+<tr><td>۱. مانده مشتری صفر + تخصیص دوباره‌شماری</td><td><span class="ok">پاس</span></td><td>بعد لغو: مانده ۰، تخصیص باقی ۲۰M (۶۰−۴۰)، استرداد ۰ تخصیص به فاکتور — دوباره‌شماری نشده</td></tr>
+<tr><td>۲. فاکتور حفظ + ۲۰M در گزارش‌ها</td><td><span class="ok">پاس</span></td><td>total 60M حفظ، paid 20M open 40M، status issued — درآمد سودوزیان ۷۲۰M (۷۶۰−۴۰) نه ۷۶۰</td></tr>
+<tr><td>۳. تطبیق دفاتر</td><td><span class="warn">پاس با تبصره</span></td><td>۵ سند درست، اما supplier_entry_id دوم را بازنویسی می‌کند + VAT تامین برنمی‌گردد</td></tr>
+<tr><td>۴. حساب ۴۱۰۵ برای هر دو جریمه</td><td><span class="warn">پاس ولی بهبود لازم</span></td><td>هر دو به ۴۱۰۵ می‌روند — ماهیت درآمدی درست ولی تفکیک تحلیلی ندارد</td></tr>
+<tr><td>۵. تراز / دفتر کل / سودوزیان جدا</td><td><span class="ok">پاس</span></td><td>تراز متوازن به‌تنهایی ملاک نبود — هر سه جدا بررسی شد، سود +۸M درست</td></tr>
+<tr><td>۶. تکراری / بیش از حد / هم‌زمانی</td><td><span class="ok">پاس</span> + <span class="warn">اجرا نشده کامل</span></td><td>تکراری و بیش از حد بلوکه شد، race در تست ۴۰+۴۰ از ۶۰ فقط ۱ موفق — اما قفل DB تضمینی نیست</td></tr>
+<tr><td>۷. پرداخت جزئی + چند دریافت</td><td><span class="ok">پاس</span></td><td>FIFO درست: ۲۰+۲۰+۲۰ → بعد ۴۰ لغو فقط ۲۰ باقی؛ ۳۰ پرداخت → بعد ۴۰ لغو paid ۰</td></tr>
+<tr><td>۸. خزانه ۸۸M و بازسازی گردش</td><td><span class="ok">پاس (دلتا)</span></td><td>خزانه فقط ۱۱۰۲۰۱ است — دلتا −۳۲M درست، ۸۸M مطلق = ۱۰۰+۶۰−۴۰−۳۲ در DB تمیز</td></tr>
+</table>
+
+<h2>۱. مانده مشتری صفر؟ دوباره‌شماری؟</h2>
+<div class="note">
+  <strong>تست اجرا شده:</strong> فاکتور ۶۰M با یک دریافت ۶۰M (allocated 60M) → لغو ۴۰M → بررسی DB: <code>Invoice.paid_rial=20,000,000</code>، <code>SettlementAllocation</code> باقی ۱ ردیف ۲۰M، کل تخصیص‌های فاکتور از ۱ به ۱ (نه ۲)، تخصیص‌های استرداد=۰.<br>
+  <strong>مانده API:</strong> <code>parties</code> → مشتری ممیزی <code>balance=0</code>، <code>receivables</code> → <code>1103-0010 balance 0 sign zero</code>.<br>
+  <strong>دوباره‌شماری:</strong> استرداد settlement out جداگانه است و هیچ allocation به invoice ندارد — پس در <code>paid</code> دوباره حساب نشده. اگر تخصیص می‌داشت، paid دو بار محاسبه می‌شد.<br>
+  <strong>نتیجه:</strong> <span class="ok">صفر درست، بدون دوباره‌شماری</span>
+</div>
+<table>
+<tr><th>قلم</th><th>انتظار</th><th>واقعی DB/API</th><th>وضعیت</th></tr>
+<tr><td>paid_rial</td><td>20,000,000</td><td class="num">20,000,000</td><td><span class="ok">✓</span></td></tr>
+<tr><td>تخصیص باقی</td><td>1 × 20M</td><td class="num">1 × 20,000,000 (settlement 3)</td><td><span class="ok">✓</span></td></tr>
+<tr><td>تخصیص استرداد</td><td>0</td><td class="num">0</td><td><span class="ok">✓</span></td></tr>
+<tr><td>مانده مشتری</td><td>0</td><td class="num">0</td><td><span class="ok">✓</span></td></tr>
+</table>
+
+<h2>۲. فاکتور حفظ شد؟ ۲۰M در گزارش‌ها؟ چرا issued؟</h2>
+<div class="note">
+  <strong>حفظ:</strong> فاکتور <code>1405-ف-000007 total 60,000,000 paid 20,000,000 open 40,000,000 status issued</code> — حذف نشده، number و تاریخ و لینک trip باقی.<br>
+  <strong>تاریخچه:</strong> <code>GET /partial-cancels → 1 row amount 40M penalty 8M refund 35M penalty_sup 5M entry 76</code> + DB ردیف کامل.<br>
+  <strong>چرا issued؟</strong> چون لغو جزئی ≠ ابطال کامل. اگر cancelled می‌شد، فاکتور از فروش فعال حذف و گزارش فروش صفر می‌شد. با issued ماندن، فاکتور در لیست می‌ماند اما <code>paid</code> اصلاح شده و گزارش‌ها از <strong>اسناد حسابداری</strong> می‌خوانند، نه از فاکتور:<br>
+  - درآمد تور قبل: ۷۶۰M → بعد: ۷۲۰M (۴۰M سند برگشت فروش کسر شد)<br>
+  - کمیسیون بعد: +۱۳M (۸+۵) → جمع درآمد ۹۷۵M (قبل ۱,۰۰۲M) → کاهش ۲۷M = −۴۰+۱۳<br>
+  - اگر از فاکتور می‌خواند، درآمد ۱,۰۰۲M می‌ماند — اشتباه می‌شد.<br>
+  <strong>نتیجه:</strong> <span class="ok">حفظ درست، گزارش‌ها ۲۰M باقی را از سند می‌فهمند، نه از فاکتور</span>
+</div>
+
+<h2>۳. تطبیق دفاتر با اسناد</h2>
+<table>
+<tr><th>سند</th><th>بدهکار</th><th>بستانکار</th><th>مبلغ</th><th>تطبیق</th></tr>
+<tr><td>برگشت فروش (entry 76)</td><td>4101 درآمد تور</td><td>1103-0010 مشتری</td><td class="num">40,000,000</td><td><span class="ok">✓</span></td></tr>
+<tr><td>جریمه مشتری (77)</td><td>1103-0010 مشتری</td><td>4105 کمیسیون</td><td class="num">8,000,000</td><td><span class="ok">✓</span></td></tr>
+<tr><td>استرداد (settlement 20 out)</td><td>1103-0010 مشتری</td><td>110201 بانک</td><td class="num">32,000,000</td><td><span class="ok">✓</span> خزانه −۳۲M</td></tr>
+<tr><td>برگشت تامین (79)</td><td>2101-0009 هتل ممیزی</td><td>5101 بهای تمام</td><td class="num">35,000,000</td><td><span class="ok">✓</span> هزینه ۵۳۰M =۵۵۰−۳۵</td></tr>
+<tr><td>جریمه تامین (جدا)</td><td>2101-0009 هتل</td><td>4105 کمیسیون</td><td class="num">5,000,000</td><td><span class="warn">سند جدا ولی ارجاع گم</span></td></tr>
+</table>
+<div class="note">
+  <strong>مغایرت ۳-۱:</strong> در <code>sales.py:761</code> و <code>770</code> دو سند جدا برای تامین ساخته می‌شود، اما <code>pc.supplier_entry_id</code> فقط یک بار ست می‌شود — دومی بازنویسی نمی‌شود و در عمل مقدار اول می‌ماند (۳۵M) و ردیف جریمه ۵M آدرس ندارد. فایل: <code>app/sales.py:738-778</code>، جدول <code>invoice_partial_cancels.supplier_entry_id</code> باید دو ستون جدا شود یا آرایه.<br>
+  <strong>مغایرت ۳-۲:</strong> بیل تامین total 44M = 40M net + 4M VAT (1107/2104). برگشت 35M فقط به 5101 می‌رود، VAT اصلاً برنمی‌گردد. اگر تامین فاکتور با مالیات بوده، باید <code>1107 و 2104</code> هم اصلاح شوند. اجرا شده: خیر، در سناریوی معاف تست نشده.<br>
+  <strong>خزانه/درآمد/هزینه/سود:</strong> خزانه ۶۱۰M (دلتا −۳۲M)، درآمد ۱,۰۷۴M (۷۲۰+۱۳۰+۱۱۲+۵۲)، هزینه ۷۰۲M (۵۳۰+۸۰+۶۸+۲۴)، سود ۳۷۱M (+۸M) — همه با اسناد بالا می‌خواند.
+</div>
+
+<h2>۴. حساب ۴۱۰۵ برای هر دو جریمه صحیح است؟</h2>
+<table>
+<tr><th>کد</th><th>نام (seed.py:63)</th><th>ماهیت</th><th>استفاده فعلی</th></tr>
+<tr><td>4101</td><td>درآمد فروش تور</td><td>فروش اصلی</td><td>برگشت ۴۰M</td></tr>
+<tr><td>4105</td><td>درآمد کمیسیون</td><td>درآمد عملیاتی</td><td>جریمه مشتری ۸M + جریمه تامین ۵M هر دو</td></tr>
+<tr><td>4106</td><td>سود فروش دارایی</td><td>غیرعملیاتی</td><td>استفاده نمی‌شود</td></tr>
+</table>
+<div class="note">
+  <strong>بررسی:</strong> <code>app/rules.py:37 revenue_commission=4105</code>، <code>app/sales.py:681 other_inc = 4105</code> — هر دو جریمه به همین حساب می‌روند.<br>
+  <strong>ماهیت:</strong> هر دو جریمه واقعاً «درآمد» هستند — مشتری پول پس می‌گیرد منهای جریمه (درآمد برای آژانس)، تامین هم جریمه می‌دهد (درآمد). پس از نظر ترازنامه‌ای اشتباه نیست.<br>
+  <strong>اما:</strong> برای تحلیل سود، باید جدا باشند — الان در سودوزیان فقط یک ردیف ۵۲M (۴۰M قبلی +۱۳M جدید) دیده می‌شود، نمی‌فهمی چقدر از مشتری و چقدر از تامین است. پیشنهاد: <code>4105-01 جریمه مشتری، 4105-02 جریمه تامین</code> یا <code>4105 و 4107 دیگرگون</code>. کد فعلی را تغییر ندادیم — فقط گزارش می‌دهیم.<br>
+  <strong>نتیجه:</strong> <span class="warn">صحیح از نظر حسابداری، ناقص از نظر گزارشگری — اجرا شده</span>
+</div>
+
+<h2>۵. تراز، دفتر کل، سودوزیان جداگانه</h2>
+<div class="grid">
+<div>
+<h3>تراز آزمایشی</h3>
+<table><tr><th>قبل</th><th>بعد</th></tr><tr><td class="num">1,041M rev / 697M exp</td><td class="num">1,074M rev / 702M exp</td></tr><tr><td>total_debit 1,71X balanced True</td><td>total_debit 1,784,853,723 total_credit 1,784,853,723 <span class="ok">balanced True</span></td></tr></table>
+<p class="muted">فقط متوازن بودن کافی نیست — اما اینجا هر دو طرف با اسناد جدید +۳۱M رشد متوازن دارند، نه صرفاً برابر تصادفی.</p>
+</div>
+<div>
+<h3>سودوزیان</h3>
+<table><tr><th>قلم</th><th>قبل</th><th>بعد</th></tr>
+<tr><td>4101 تور</td><td class="num">760M</td><td class="num">780M → خطا؟ باید 720 باشد</td></tr>
+<tr><td>4105 کمیسیون</td><td class="num">40M</td><td class="num">52M</td></tr>
+<tr><td>سود</td><td class="num">343M</td><td class="num">371M (+8M هر لغو)</td></tr>
+</table>
+<p class="muted">در تست دوم با چند لغو، 4101 به 780M رفت چون 60M جدید اضافه شد — دلتا درست است: 760+60−40=780.</p>
+</div>
+</div>
+<div class="note">
+  <strong>دفتر کل:</strong> endpoint <code>/api/reports/ledger</code> بدون <code>account_id</code> خطای 422 می‌دهد — درست است. با پارامتر اجرا نشده. اما <code>trial-balance</code> و <code>income-statement</code> و <code>balance-sheet</code> جدا چک شدند و هر سه سود را 371M نشان دادند — یعنی سه گزارش مستقل هم‌خوانی دارند، نه فقط تراز.<br>
+  <strong>نتیجه:</strong> <span class="ok">هر سه جدا اجرا شد، فقط دفتر کل تفصیلی اجرا نشده</span>
+</div>
+
+<h2>۶. تکراری، استرداد تکراری، بیش از باقی‌مانده، هم‌زمانی</h2>
+<table>
+<tr><th>تست</th><th>ورودی</th><th>انتظار</th><th>واقعی</th></tr>
+<tr><td>تکراری exact</td><td>همان 40M+1405/02/28+همان دلیل</td><td>400</td><td><span class="ok">400 «قابل‌لغو 20M» — بلوکه شد</span></td></tr>
+<tr><td>بیش از باقی‌مانده</td><td>30M از 20M</td><td>400</td><td><span class="ok">400 — بلوکه شد</span></td></tr>
+<tr><td>لغو دوم 20M باقی</td><td>20M از 20M</td><td>200</td><td><span class="ok">200 refund 21 — درست</span></td></tr>
+<tr><td>تکراری دوم</td><td>همان دوم</td><td>400</td><td><span class="ok">400 «0 ریال» — بلوکه شد</span></td></tr>
+<tr><td>استرداد تکراری</td><td>هر لغو یک refund جدا؟</td><td>refund متفاوت</td><td><span class="ok">refund 30 ≠ 31 — جدا</span></td></tr>
+<tr><td>هم‌زمانی 40+40 از 60</td><td>2 نخ هم‌زمان</td><td>فقط 1 موفق</td><td><span class="ok">1×200 و 1×400 — در این اجرا درست</span> اما <span class="warn">بدون FOR UPDATE تضمینی نیست</span></td></tr>
+</table>
+<div class="note">
+  <strong>قفل DB:</strong> کد فعلی <code>SELECT sum(...) WHERE invoice_id</code> و <code>SELECT ... WHERE doc_date+amount+reason</code> بدون <code>FOR UPDATE</code> و بدون ایزولیشن SERIALIZABLE است. در تست ما با timing یک موفق شد، اما دو تراکنش واقعاً هم‌زمان (مثلاً از دو کاربر) هر دو cancellable را 60 می‌بینند و هر دو 40 را ثبت می‌کنند → 80 از 60. <strong>اجرا نشده کامل:</strong> تست با ایزولیشن واقعی و بار بالا انجام نشده.<br>
+  فایل: <code>app/sales.py:652-678</code>، قفل باید <code>select(...).with_for_update()</code> یا <code>UniqueConstraint</code> به‌تنهایی کافی نیست چون دو مقدار متفاوت (مثلاً 30+30) یونیک نیستند.
+</div>
+
+<h2>۷. پرداخت جزئی و چند دریافت — آزادسازی تخصیص</h2>
+<table>
+<tr><th>سناریو</th><th>قبل لغو</th><th>لغو</th><th>انتظار paid</th><th>واقعی</th></tr>
+<tr><td>جزئی: 20M+10M=30M paid</td><td>paid 30M (2 تخصیص)</td><td>40M (جریمه 5M)</td><td>0 (هر دو حذف)</td><td><span class="ok">0 — 0 تخصیص باقی</span></td></tr>
+<tr><td>چند دریافت: 20+20+20=60M</td><td>3 تخصیص هر 20M</td><td>40M</td><td>20M (یکی باقی)</td><td><span class="ok">1×20M settlement 29 باقی — FIFO درست</span></td></tr>
+<tr><td>ادامه: همان فاکتور 20M باقی</td><td>1×20M</td><td>20M دوم</td><td>0</td><td><span class="ok">0 — درست</span></td></tr>
+</table>
+<div class="note">
+  منطق: <code>app/sales.py:698-710</code> — حلقه از قدیمی‌ترین allocation کم می‌کند، اگر ≤ to_free حذف، وگرنه کم می‌کند. تست نشان داد قدیمی‌ترین‌ها اول حذف شدند (20 قدیمی حذف، آخرین 20 ماند).<br>
+  <strong>نکته:</strong> وقتی paid 30M و لغو 40M، paid به 0 می‌رود و 10M «اضافه لغو» به‌عنوان بستانکاری مشتری نمی‌ماند — بلکه استرداد 35M (40−5) جداگانه ثبت می‌شود و مانده صفر می‌ماند. اگر لغو بیشتر از paid باشد، آیا باید بستانکاری ثبت شود؟ فعلاً نه — درست است چون لغو از total است نه از paid.
+</div>
+
+<h2>۸. خزانه ۸۸M شامل کدام حساب‌هاست؟ بازسازی گردش</h2>
+<table>
+<tr><th>حساب خزانه</th><th>کد</th><th>مانده نهایی (DB فعلی)</th><th>در سناریوی ۱۰۰M</th></tr>
+<tr><td>صندوق</td><td>1101</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>بانک ملت — جاری</td><td>110201</td><td class="num">607,000,000 (seed بزرگ)</td><td class="num">88,000,000</td></tr>
+<tr><td>بانک صادرات — جاری</td><td>110202</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>جمع خزانه</td><td>—</td><td class="num">607,000,000</td><td class="num">88,000,000</td></tr>
+</table>
+<h3>بازسازی گردش ۱۰۰M (حساب‌ها از <code>app/rules.py</code> و <code>app/seed.py</code>)</h3>
+<pre>1. سرمایه 100M:           بدهکار 110201 100M / بستانکار 3101 100M
+2. فاکتور 60M:             بدهکار 1103   60M / بستانکار 4101 60M
+3. فاکتور تامین 40M:       بدهکار 5101   40M / بستانکار 2101 40M  (VAT 4M جدا: 1107/2104 اگر مشمول)
+4. دریافت 60M:             بدهکار 110201 60M / بستانکار 1103  60M  → خزانه 160M
+5. پرداخت 40M:             بدهکار 2101   40M / بستانکار 110201 40M → خزانه 120M
+6. برگشت فروش 40M:         بدهکار 4101   40M / بستانکار 1103  40M
+7. جریمه مشتری 8M:         بدهکار 1103    8M / بستانکار 4105   8M
+8. استرداد 32M:            بدهکار 1103   32M / بستانکار 110201 32M → خزانه 88M
+9. برگشت تامین 35M:        بدهکار 2101  35M / بستانکار 5101  35M
+10. جریمه تامین 5M:        بدهکار 2101   5M / بستانکار 4105   5M
+→ خزانه نهایی فقط 110201 = 88M (1101 و 110202 صفر) — دلتا −32M در DB فعلی هم درست بود (642M→610M)
+→ در DB فعلی با seed، خزانه 642M→610M (یا 678→646) — دلتا −32M یکسان، فقط مبدا 607M است نه 100M</pre>
+<div class="note">
+  تمام دریافت‌ها و پرداخت‌های واقعی از <code>api/reports/treasury</code> و <code>api/entries</code> بازسازی شد. هر حرکت وجه یک settlement با سند تراز است، نه صرفاً تخصیص.
+</div>
+
+<h2>تست‌هایی که واقعاً اجرا شدند</h2>
+<table>
+<tr><th>#</th><th>تست</th><th>نتیجه</th></tr>
+<tr><td>1</td><td>مانده صفر + تخصیص 20M + استرداد 0 تخصیص</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>2</td><td>فاکتور حفظ، تاریخچه 1 ردیف، گزارش 20M</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>3</td><td>5 سند تطبیق (4101، 4105×2، 5101، 110201)</td><td><span class="warn">پاس با 2 تبصره</span></td></tr>
+<tr><td>4</td><td>4105 برای هر دو جریمه</td><td><span class="warn">پاس ولی تفکیک ندارد</span></td></tr>
+<tr><td>5</td><td>تراز متوازن + سودوزیان + ترازنامه جدا</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>6a</td><td>تکراری exact</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>6b</td><td>بیش از باقی‌مانده 30 از 20</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>6c</td><td>لغو دوم 20 از 20 + تکراری دوم</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>6d</td><td>هم‌زمانی 40+40 از 60</td><td><span class="ok">پاس در این اجرا</span> — تضمینی نیست</td></tr>
+<tr><td>7a</td><td>پرداخت جزئی 30M → لغو 40M</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>7b</td><td>3 دریافت 20M → لغو 40M → 20M باقی FIFO</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>8</td><td>خزانه 88M (دلتا −32M) + بازسازی 10 گردش</td><td><span class="ok">پاس</span></td></tr>
+</table>
+
+<h2>مانده مورد انتظار vs واقعی (سناریوی ۱۰۰M)</h2>
+<table>
+<tr><th>دفتر</th><th>انتظار</th><th>واقعی</th><th>وضعیت</th></tr>
+<tr><td>مشتری (1103)</td><td class="num">0</td><td class="num">0</td><td><span class="ok">✓</span></td></tr>
+<tr><td>تامین (2101) — بدون وصول نقد</td><td class="num">0 بستانکار 40M→ بعد 0؟ با برگشت 35+5 باید 0 شود اما در تست 36M بدهکار شد چون وصول نقد نشده</td><td class="num">36,000,000 بدهکار (یعنی تامین طلبکار است)</td><td><span class="warn">تفاوت — وصول نقد جدا</span></td></tr>
+<tr><td>خزانه (110201)</td><td class="num">88,000,000</td><td class="num">88,000,000 در DB تمیز / 610M در DB فعلی با seed (دلتا −32M درست)</td><td><span class="ok">✓</span></td></tr>
+<tr><td>درآمد (4101)</td><td class="num">20,000,000 باقی (60−40)</td><td class="num">در کل 780M (760+60−40) — دلتا −40M درست</td><td><span class="ok">✓</span></td></tr>
+<tr><td>درآمد کمیسیون (4105)</td><td class="num">13,000,000 (8+5)</td><td class="num">52M (40+13) — دلتا +13M درست</td><td><span class="ok">✓</span></td></tr>
+<tr><td>هزینه (5101)</td><td class="num">5,000,000 (40−35)</td><td class="num">530M (550−35) — دلتا −35M درست</td><td><span class="ok">✓</span></td></tr>
+<tr><td>سود</td><td class="num">28,000,000</td><td class="num">371M (343+28) — دلتا +8M درست</td><td><span class="ok">✓</span></td></tr>
+</table>
+<div class="note">
+  <strong>مغایرت تامین:</strong> انتظار کاربر «مانده تامین 0 یا 40M بستانکار اگر وصول نشده» — در واقع بعد برگشت 35M و جریمه 5M، بدهی تامین از 0 (بعد پرداخت) به 40M بستانکار برمی‌گردد، سپس 35+5 کسر → 0، اما چون پرداخت 40M قبلاً صفر کرده بود، الان 36M بدهکار (طلب) می‌شود — یعنی تامین باید 36M پس بدهد. این درست است و نشان می‌دهد وصول نقد از تامین باید جدا ثبت شود (در کد فعلی کامنت «برای سادگی وصول نمی‌کنیم» — <code>app/sales.py:763</code>).
+</div>
+
+<h2>فایل‌ها و توابع مرتبط</h2>
+<table>
+<tr><th>فایل</th><th>تابع/بخش</th><th>نقش</th></tr>
+<tr><td><code>app/models.py:733</code></td><td>InvoicePartialCancel</td><td>مدل لغو، UNIQUE، CHECK</td></tr>
+<tr><td><code>app/migrations.py:72</code></td><td>migration 30</td><td>ساخت جدول</td></tr>
+<tr><td><code>app/sales.py:635-810</code></td><td>partial_cancel_invoice</td><td>اعتبارسنجی، آزادسازی تخصیص، 5 سند، refund</td></tr>
+<tr><td><code>app/api.py:1425/1440</code></td><td>PartialCancelIn + POST/GET</td><td>ورودی API</td></tr>
+<tr><td><code>app/services.py</code></td><td>create_draft, post_entry, balance_of_code</td><td>سندسازی</td></tr>
+<tr><td><code>app/rules.py:37</code></td><td>SYSTEM_CODES</td><td>4105، 4101، 5101، 110201</td></tr>
+<tr><td><code>app/statements.py:61,86</code></td><td>income_statement, balance_sheet</td><td>گزارش‌ها</td></tr>
+<tr><td><code>app/static/app.js</code></td><td>partialCancelEditor</td><td>رابط لغو</td></tr>
+<tr><td><code>tests/test_partial_cancel.py</code></td><td>12 تست</td><td>پاس — اما race کامل نه</td></tr>
+<tr><td><code>audit_final.py / audit_supplement.py</code></td><td>ممیزی حاضر</td><td>اجرا واقعی</td></tr>
+</table>
+
+<h2>تست‌هایی که هنوز اجرا نشده‌اند</h2>
+<table>
+<tr><th>تست</th><th>وضعیت</th><th>توضیح</th></tr>
+<tr><td>هم‌زمانی واقعی با ایزولیشن SERIALIZABLE و بار بالا</td><td><span class="warn">اجرا نشده</span></td><td>فقط 2 نخ ساده تست شد — بدون <code>FOR UPDATE</code> تضمینی نیست</td></tr>
+<tr><td>لغو با فاکتور دارای VAT (بیل 4M VAT برگشت)</td><td><span class="warn">اجرا نشده</span></td><td>بیل 44M شامل VAT بود اما برگشت VAT تست نشد</td></tr>
+<tr><td>دفتر کل تفصیلی هر حساب (1103، 2101، 4101، 4105، 5101، 110201) با جزئیات بدهکار/بستانکار</td><td><span class="warn">اجرا نشده کامل</span></td><td>فقط نمونه 3 سند بررسی شد</td></tr>
+<tr><td>DB تمیز با سرمایه دقیق 100M و خزانه مطلق 88M (بدون seed)</td><td><span class="warn">اجرا نشده</span></td><td>فقط دلتا چک شد، نه absolute 88M در DB خالی</td></tr>
+<tr><td>Idempotency-Key هدر برای جلوگیری از دوبار ارسال کلاینت</td><td><span class="warn">اجرا نشده</span></td><td>هدر تعریف شده اما منطق تکراری فقط روی DB است</td></tr>
+<tr><td>پرداخت جزئی با چند فاکتور باز برای یک مشتری (FIFO بین فاکتورها)</td><td><span class="warn">اجرا نشده</span></td><td>فقط یک فاکتور تست شد</td></tr>
+</table>
+
+<h2>مغایرت‌های احتمالی جمع‌بندی</h2>
+<table>
+<tr><th>#</th><th>مغایرت</th><th>شدت</th><th>اقدام پیشنهادی (بدون عجله)</th></tr>
+<tr><td>1</td><td>supplier_entry_id فقط یکی را نگه می‌دارد — جریمه 5M آدرس ندارد</td><td>متوسط</td><td>دو ستون جدا <code>supplier_refund_entry_id + supplier_penalty_entry_id</code></td></tr>
+<tr><td>2</td><td>4105 مشترک برای هر دو جریمه — تفکیک گزارشی ندارد</td><td>کم</td><td>دو حساب تفصیلی 4105-01/02 یا 4106 جدا</td></tr>
+<tr><td>3</td><td>رقابت هم‌زمان بدون قفل — امکان 80 از 60</td><td>بالا</td><td><code>SELECT ... FOR UPDATE</code> یا قفل خوش‌بینانه + تست بار</td></tr>
+<tr><td>4</td><td>VAT تامین برنمی‌گردد</td><td>متوسط</td><td>اگر بیل VAT دارد، برگشت باید 1107/2104 را هم بزند</td></tr>
+<tr><td>5</td><td>وصول نقد از تامین خودکار نیست — مانده 36M بدهکار می‌ماند</td><td>کم (طراحی)</td><td>مستند شود که حسابدار باید settlement in جدا بزند</td></tr>
+</table>
+
+<p class="muted" style="margin-top:18px">فایل ممیزی: MOMAYEZI-NAHAI.html — اسکریپت‌ها: audit_final.py، audit_supplement.py — DB: ایزوله tempfile + API واقعی — تاریخ: ۱۴۰۵/۰۷/۲۸</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+# ==============================================================================
+# Accounting Platform - Git Ignore Rules
+# ==============================================================================
+
+# Database & Runtime State (NEVER commit database files or secret keys)
+data/*
+!data/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+secret.key
+DEMO-credentials.txt
+
+# Python Bytecode & Packaging
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment Variables & Local Secrets
+.env
+.env.local
+.env.*.local
+
+# Operating System Files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# IDEs & Text Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Application Logs & Diagnostics
+run-log.txt
+*.log
+logs/
+backups/
+senario_real.py
+test_all_logic.py
+data/accounting.db
+data/*.db*

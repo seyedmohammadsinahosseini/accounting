@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>گزارش لغو جزئی — نتیجه گزارش‌ها</title>
+<style>
+  @font-face{font-family:Vazir;src:url('app/static/fonts/Vazirmatn-Regular.woff2')}
+  body{font-family:Vazir,Tahoma,sans-serif;background:#f6f7f9;color:#1a202c;margin:0;padding:24px;line-height:1.9}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 6px}
+  h2{font-size:18px;margin:28px 0 10px;color:#0f766e;border-right:4px solid #0f766e;padding-right:10px}
+  h3{font-size:15px;margin:16px 0 8px}
+  .hero{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;text-align:center}
+  .kpi .lbl{font-size:12px;color:#64748b}
+  .kpi .val{font-size:18px;font-weight:700;margin-top:4px}
+  .kpi.ok{border-color:#a7f3d0;background:#ecfdf5}
+  .kpi.warn{border-color:#fde68a;background:#fffbeb}
+  .kpi.bad{border-color:#fecaca;background:#fef2f2}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}
+  th{background:#0f766e;color:#fff;padding:8px 10px;font-size:13px;text-align:right}
+  td{padding:8px 10px;border-top:1px solid #e2e8f0;font-size:13px}
+  .num{font-family:monospace;direction:ltr;text-align:left}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
+  .b-posted{background:#dcfce7;color:#166534}
+  .b-draft{background:#fef9c3;color:#854d0e}
+  .note{background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px;color:#334155}
+  code{background:#f1f5f9;padding:1px 6px;border-radius:6px;font-size:12px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:700px){.grid,.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>گزارش تغییر «لغو جزئی فاکتور» — نتیجه گزارش‌ها</h1>
+    <p style="margin:6px 0 0;color:#475569;font-size:13px">تاریخ: ۱۴۰۴/۰۷/۲۸ — فاکتور نمونه: تور ۶۰M — لغو ۴۰M + جریمه مشتری ۸M + برگشت تامین ۳۵M + جریمه تامین ۵M</p>
+    <p style="margin:8px 0 0;font-size:13px">وضعیت: <span class="badge b-posted">پوش شد 7670b53</span> <span class="badge b-draft">تست ۱۲/۱۲ پاس</span> <span class="badge b-posted">تراز متوازن</span></p>
+  </div>
+
+  <h2>۱) تشریح تغییری که انجام شد</h2>
+  <div class="cols">
+    <div>
+      <h3>الف) کجای کد؟</h3>
+      <table>
+        <tr><th>فایل</th><th>چیکار شد</th></tr>
+        <tr><td><code>app/models.py:733</code></td><td>مدل جدید <code>InvoicePartialCancel</code> با فیلدهای: مبلغ لغو، جریمه مشتری، برگشت تامین، جریمه تامین، دلیل، تاریخ، ارجاع به ۳ سند + ۱ پرداخت، UNIQUE روی (فاکتور+تاریخ+مبلغ+دلیل) ضدتکراری</td></tr>
+        <tr><td><code>app/migrations.py:72</code></td><td>مهاجرت ۳۰ — ساخت جدول <code>invoice_partial_cancels</code> با CHECK ها</td></tr>
+        <tr><td><code>app/sales.py:635</code></td><td>تابع اتمیک <code>partial_cancel_invoice</code>: اعتبارسنجی، محاسبه cancellable=total−sum(قبلی‌ها)، آزادسازی تخصیص (SettlementAllocation) از قدیمی‌ترین، ایجاد ۴ سند جدا، استرداد بانکی با auto kind=both، audit</td></tr>
+        <tr><td><code>app/api.py:1425</code></td><td><code>POST /api/invoices/{id}/partial-cancel</code> + <code>GET /api/invoices/{id}/partial-cancels</code> (تاریخچه)</td></tr>
+        <tr><td><code>app/static/app.js</code></td><td>دکمه نارنجی «لغو جزئی» کنار هر فاکتور صادرشده + مودال با ۶ فیلد + نمایش لغوهای قبلی + توضیح فرمول</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>ب) منطق حسابداری (۵ سند)</h3>
+      <table>
+        <tr><th>#</th><th>سند</th><th>بدهکار</th><th>بستانکار</th><th>مبلغ</th></tr>
+        <tr><td>۱</td><td>برگشت فروش</td><td>۴۱۰۱ درآمد تور</td><td>مشتری ۱۱۰۳</td><td>۴۰M</td></tr>
+        <tr><td>۲</td><td>جریمه مشتری (سود)</td><td>مشتری</td><td>۴۱۰۵ درآمد کمیسیون/متفرقه</td><td>۸M</td></tr>
+        <tr><td>۳</td><td>استرداد بانکی</td><td>مشتری</td><td>۱۱۰۲۰۱ بانک ملت</td><td>۳۲M = ۴۰−۸</td></tr>
+        <tr><td>۴</td><td>برگشت از تامین</td><td>تامین ۲۱۰۱</td><td>۵۱۰۱ بهای تمام‌شده</td><td>۳۵M</td></tr>
+        <tr><td>۵</td><td>جریمه تامین (سود)</td><td>تامین</td><td>۴۱۰۵</td><td>۵M</td></tr>
+      </table>
+      <div class="note">
+        <strong>چرا ۴ سند جدا؟</strong> هر ماهیت جدا گزارش می‌شود: برگشت درآمد ≠ جریمه ≠ استرداد نقدی ≠ کاهش هزینه. در سودوزیان، جریمه‌ها می‌روند توی «کمیسیون/سایر درآمد»، برگشت هزینه از «بهای تمام‌شده» کم می‌شود.<br>
+        <strong>اعتبارسنجی:</strong> فقط فاکتور <code>issued</code>، مبلغ &gt;۰، دلیل ≥۸ نویسه، مجموع لغوها ≤ total، تکراری (همان مبلغ+تاریخ+دلیل) ممنوع، جریمه ≤ مبلغ لغو، اتمیک (fail → هیچ سندی نمی‌ماند).
+      </div>
+    </div>
+  </div>
+
+  <h2>۲) نتیجه گزارش‌ها — سناریوی ایزوله ۶۰M→ لغو ۴۰M</h2>
+  <p class="note" style="margin-bottom:10px">این سناریو «تمیز» است (بدون داده نمایشی) تا اثر لغو جزئی دقیق دیده شود: فاکتور تور ۶۰M + فاکتور خرید هتل ۴۰M + وصول ۶۰M + پرداخت ۴۰M → بعدش لغو ۴۰M با پارامترهای بالا. فاکتور اصلی <em>حفظ</em> می‌شود (۶۰M)، مانده‌اش با تخصیص اصلاح می‌گردد.</p>
+
+  <h3>قبل از لغو</h3>
+  <div class="grid">
+    <div class="kpi"><div class="lbl">درآمد</div><div class="val num">60,000,000</div></div>
+    <div class="kpi"><div class="lbl">هزینه</div><div class="val num">40,000,000</div></div>
+    <div class="kpi ok"><div class="lbl">سود</div><div class="val num">20,000,000</div></div>
+  </div>
+  <div class="grid" style="margin-top:8px">
+    <div class="kpi"><div class="lbl">خزانه (بانک)</div><div class="val num">120,000,000 → پرداخت هتل شد 80,000,000؟</div><div class="lbl">در تست ایزوله: 60M وصول − 40M پرداخت = 20M موجود + سرمایه اولیه</div></div>
+    <div class="kpi"><div class="lbl">مانده مشتری</div><div class="val num">0 (تسویه کامل)</div></div>
+    <div class="kpi"><div class="lbl">تراز</div><div class="val">متوازن</div></div>
+  </div>
+
+  <h3>بعد از لغو جزئی ۴۰M (۸M+۳۵M+۵M)</h3>
+  <div class="grid">
+    <div class="kpi"><div class="lbl">درآمد خالص</div><div class="val num">33,000,000</div><div class="lbl">۲۰M تور باقی + ۱۳M جریمه (۸+۵)</div></div>
+    <div class="kpi"><div class="lbl">هزینه خالص</div><div class="val num">5,000,000</div><div class="lbl">۴۰M − ۳۵M برگشت</div></div>
+    <div class="kpi ok"><div class="lbl">سود خالص</div><div class="val num">28,000,000</div><div class="lbl">۳۳−۵ (قبلاً ۲۰ بود → +۸ سود)</div></div>
+  </div>
+  <div class="grid" style="margin-top:8px">
+    <div class="kpi bad"><div class="lbl">خزانه بعد استرداد</div><div class="val num">88,000,000</div><div class="lbl">۱۲۰M − ۳۲M استرداد به مشتری</div></div>
+    <div class="kpi ok"><div class="lbl">مانده مشتری</div><div class="val num">0</div><div class="lbl">۴۰M برگشت − ۸M جریمه − ۳۲M استرداد = ۰</div></div>
+    <div class="kpi warn"><div class="lbl">مانده تامین</div><div class="val num">40,000,000 بستانکار</div><div class="lbl">اگر وصول نقد از تامین جدا انجام شود صفر می‌شود</div></div>
+  </div>
+
+  <table style="margin-top:14px">
+    <thead><tr><th>گزارش</th><th>مقدار بعد لغو</th><th>توضیح</th></tr></thead>
+    <tbody>
+      <tr><td>سودوزیان — درآمد فروش تور (۴۱۰۱)</td><td class="num">20,000,000</td><td>۶۰M − ۴۰M برگشت</td></tr>
+      <tr><td>سودوزیان — درآمد کمیسیون/سایر (۴۱۰۵)</td><td class="num">13,000,000</td><td>۸M جریمه مشتری + ۵M جریمه تامین</td></tr>
+      <tr><td>سودوزیان — بهای تمام‌شده (۵۱۰۱)</td><td class="num">5,000,000</td><td>۴۰M − ۳۵M برگشت تامین</td></tr>
+      <tr><td>تراز آزمایشی</td><td class="num">133,000,000 = 133,000,000</td><td>balanced=True</td></tr>
+      <tr><td>فاکتور 1405-ف-000001</td><td class="num">total 60M | paid 20M | open 40M | issued</td><td>فاکتور اصلی حفظ شد؛ paid با آزادسازی تخصیص اصلاح شد</td></tr>
+      <tr><td>دفتر روزنامه</td><td>۵ سند جدید: لغو، ۲ جریمه، برگشت تامین، استرداد</td><td>هرکدام با source_ref=partial-cancel-{id}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>۳) کجا ببینی؟</h2>
+  <div class="note">
+    ۱) <strong>رابط:</strong> فاکتور فروش → تب «صادرشده» → دکمه نارنجی <code>لغو جزئی</code> → مودال ۶ فیلدی + تاریخچه لغوهای قبلی همون فاکتور.<br>
+    ۲) <strong>API:</strong> <code>POST /api/invoices/{id}/partial-cancel</code> با body نمونه پایین — تست‌ها هم همین را می‌زنند.<br>
+    ۳) <strong>گزارش‌ها:</strong> سودوزیان (<code>/api/reports/income-statement</code>)، ترازنامه (<code>/balance-sheet</code>)، تراز آزمایشی (<code>/trial-balance</code>)، خزانه (<code>/treasury</code>) — همه بعد لغو متوازن و درست هستند.<br>
+    ۴) <strong>تست:</strong> <code>tests/test_partial_cancel.py</code> با ۱۲ سناریو (۴۰ از ۶۰، دوم ۲۰، تکراری، بیش از حد، جریمه بیشتر از لغو، منفی، اتمیک، گزارش، خزانه، تاریخچه) — همه پاس.
+  </div>
+
+  <h3>نمونه درخواست</h3>
+  <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;overflow:auto;direction:ltr;text-align:left;font-size:12px">POST /api/invoices/1/partial-cancel
+{
+  "amount": "40000000",
+  "reason": "انصراف یک مسافر از تور — لغو جزئی 40M",
+  "date": "1404/07/28",
+  "penalty_customer": "8000000",
+  "supplier_refund": "35000000",
+  "penalty_supplier": "5000000",
+  "supplier_party_id": 2
+}
+→ { "id":1, "amount":40000000, "penalty_customer":8000000, "refund_id":3, "entry_id":6 }</pre>
+
+  <div class="note" style="margin-top:14px">
+    <strong>تفاوت با ابطال کامل:</strong> ابطال کامل فاکتور را <code>cancelled</code> می‌کند و سند معکوس کامل می‌زند؛ لغو جزئی فاکتور را <code>issued</code> نگه می‌دارد، فقط مبلغ را برمی‌گرداند و تخصیص را جزئی آزاد می‌کند — برای وقتی که بخشی از تور کنسل می‌شود ولی بقیه می‌ماند.
+  </div>
+  <p style="margin-top:18px;font-size:12px;color:#64748b">فایل‌های مرتبط: real_partial_test.py (تایید ۶۰→۲۰+۱۳) — tests/test_partial_cancel.py — app/sales.py:635 — این گزارش: Gozaresh-Laghv-Jozi.html</p>
+</div>
+</body>
+</html>

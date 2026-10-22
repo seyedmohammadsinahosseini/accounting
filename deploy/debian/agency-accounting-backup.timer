@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily verified backup for Agency Accounting
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=agency-accounting-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,1248 @@
+{
+ "generated_at": "2026-10-20T14:14:16",
+ "entries": [
+  {
+   "id": 1,
+   "entry_no": "1405-000001",
+   "date": "2026-10-20",
+   "desc": "سرمایه‌ی اولیه مالک ۱۰۰",
+   "status": "posted",
+   "source": "manual",
+   "ref": null,
+   "debit": 100,
+   "credit": 100,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 100,
+     "c": 0
+    },
+    {
+     "code": "3101",
+     "name": "سرمایه",
+     "d": 0,
+     "c": 100
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "entry_no": "1405-000002",
+   "date": "2026-10-20",
+   "desc": "فاکتور فروش 1405-ف-000001 — مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-ف-000001",
+   "debit": 60,
+   "credit": 60,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 60,
+     "c": 0
+    },
+    {
+     "code": "4101",
+     "name": "درآمد فروش تور",
+     "d": 0,
+     "c": 60
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "entry_no": "1405-000003",
+   "date": "2026-10-20",
+   "desc": "فاکتور فروش 1405-ف-000002 — مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-ف-000002",
+   "debit": 40,
+   "credit": 40,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 40,
+     "c": 0
+    },
+    {
+     "code": "4101",
+     "name": "درآمد فروش تور",
+     "d": 0,
+     "c": 40
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "entry_no": "1405-000004",
+   "date": "2026-10-20",
+   "desc": "دریافت 1405-د-000001 از مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-د-000001",
+   "debit": 25,
+   "credit": 25,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 25,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 25
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "entry_no": "1405-000005",
+   "date": "2026-10-20",
+   "desc": "دریافت 1405-د-000002 از مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-د-000002",
+   "debit": 35,
+   "credit": 35,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 35,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 35
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "entry_no": "1405-000006",
+   "date": "2026-10-20",
+   "desc": "دریافت 1405-د-000003 از مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-د-000003",
+   "debit": 20,
+   "credit": 20,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 20,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 20
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "entry_no": "1405-000007",
+   "date": "2026-10-20",
+   "desc": "صورتحساب تأمین‌کننده 1405-خ-000001 — تأمین‌کننده S1 — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-خ-000001",
+   "debit": 44,
+   "credit": 44,
+   "lines": [
+    {
+     "code": "5101",
+     "name": "بهای تمام‌شده‌ی خدمات",
+     "d": 40,
+     "c": 0
+    },
+    {
+     "code": "1107",
+     "name": "مالیات بر ارزش افزوده — اعتبار مالیاتی",
+     "d": 4,
+     "c": 0
+    },
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 44
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "entry_no": "1405-000008",
+   "date": "2026-10-20",
+   "desc": "پرداخت 1405-پ-000001 به تأمین‌کننده S1 — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-پ-000001",
+   "debit": 44,
+   "credit": 44,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 44,
+     "c": 0
+    },
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 0,
+     "c": 44
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "entry_no": "1405-000009",
+   "date": "2026-10-20",
+   "desc": "لغو جزئی 25 از فاکتور 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "partial-cancel-1",
+   "debit": 25,
+   "credit": 25,
+   "lines": [
+    {
+     "code": "4101",
+     "name": "درآمد فروش تور",
+     "d": 25,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 25
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "entry_no": "1405-000010",
+   "date": "2026-10-20",
+   "desc": "جریمه لغو مشتری 5 فاکتور 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-cust-1",
+   "debit": 5,
+   "credit": 5,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 5,
+     "c": 0
+    },
+    {
+     "code": "4107",
+     "name": "درآمد جریمه از مشتری — لغو خدمات",
+     "d": 0,
+     "c": 5
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "entry_no": "1405-000011",
+   "date": "2026-10-20",
+   "desc": "پرداخت 1405-پ-000002 به مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-پ-000002",
+   "debit": 20,
+   "credit": 20,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 20,
+     "c": 0
+    },
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 0,
+     "c": 20
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "entry_no": "1405-000012",
+   "date": "2026-10-20",
+   "desc": "برگشت 20 از تامین بابت لغو 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "supplier-refund-1",
+   "debit": 20,
+   "credit": 20,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 20,
+     "c": 0
+    },
+    {
+     "code": "5101",
+     "name": "بهای تمام‌شده‌ی خدمات",
+     "d": 0,
+     "c": 20
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "entry_no": "1405-000013",
+   "date": "2026-10-20",
+   "desc": "جریمه تامین 3 بابت لغو 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-sup-1",
+   "debit": 3,
+   "credit": 3,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 3,
+     "c": 0
+    },
+    {
+     "code": "4108",
+     "name": "درآمد جریمه از تامین‌کننده — لغو خرید",
+     "d": 0,
+     "c": 3
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "entry_no": "1405-000014",
+   "date": "2026-10-20",
+   "desc": "لغو جزئی 15 از فاکتور 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "partial-cancel-2",
+   "debit": 15,
+   "credit": 15,
+   "lines": [
+    {
+     "code": "4101",
+     "name": "درآمد فروش تور",
+     "d": 15,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 15
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "entry_no": "1405-000015",
+   "date": "2026-10-20",
+   "desc": "جریمه لغو مشتری 2 فاکتور 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-cust-2",
+   "debit": 2,
+   "credit": 2,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 2,
+     "c": 0
+    },
+    {
+     "code": "4107",
+     "name": "درآمد جریمه از مشتری — لغو خدمات",
+     "d": 0,
+     "c": 2
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "entry_no": "1405-000016",
+   "date": "2026-10-20",
+   "desc": "پرداخت 1405-پ-000003 به مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-پ-000003",
+   "debit": 13,
+   "credit": 13,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 13,
+     "c": 0
+    },
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 0,
+     "c": 13
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "entry_no": "1405-000017",
+   "date": "2026-10-20",
+   "desc": "برگشت 10 از تامین بابت لغو 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "supplier-refund-2",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "5101",
+     "name": "بهای تمام‌شده‌ی خدمات",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "entry_no": "1405-000018",
+   "date": "2026-10-20",
+   "desc": "جریمه تامین 1 بابت لغو 1405-ف-000001",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-sup-2",
+   "debit": 1,
+   "credit": 1,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 1,
+     "c": 0
+    },
+    {
+     "code": "4108",
+     "name": "درآمد جریمه از تامین‌کننده — لغو خرید",
+     "d": 0,
+     "c": 1
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "entry_no": "1405-000019",
+   "date": "2026-10-20",
+   "desc": "وصول ۳۰ از S1 بابت برگشت‌های لغو A1 (۲۵ و ۱۵) — بدون اثر درآمد/هزینه",
+   "status": "posted",
+   "source": "manual",
+   "ref": null,
+   "debit": 30,
+   "credit": 30,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 30,
+     "c": 0
+    },
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 30
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "entry_no": "1405-000020",
+   "date": "2026-10-20",
+   "desc": "دریافت 1405-د-000004 از مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-د-000004",
+   "debit": 20,
+   "credit": 20,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 20,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 20
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "entry_no": "1405-000021",
+   "date": "2026-10-20",
+   "desc": "لغو جزئی 10 از فاکتور 1405-ف-000002",
+   "status": "posted",
+   "source": "system",
+   "ref": "partial-cancel-3",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "4101",
+     "name": "درآمد فروش تور",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "entry_no": "1405-000022",
+   "date": "2026-10-20",
+   "desc": "جریمه لغو مشتری 1 فاکتور 1405-ف-000002",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-cust-3",
+   "debit": 1,
+   "credit": 1,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 1,
+     "c": 0
+    },
+    {
+     "code": "4107",
+     "name": "درآمد جریمه از مشتری — لغو خدمات",
+     "d": 0,
+     "c": 1
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "entry_no": "1405-000023",
+   "date": "2026-10-20",
+   "desc": "پرداخت 1405-پ-000004 به مشتری A — سناریو ۸ مرحله",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-پ-000004",
+   "debit": 9,
+   "credit": 9,
+   "lines": [
+    {
+     "code": "1103-0001",
+     "name": "مشتری A — سناریو ۸ مرحله",
+     "d": 9,
+     "c": 0
+    },
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 0,
+     "c": 9
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "entry_no": "1405-000024",
+   "date": "2026-10-20",
+   "desc": "برگشت 8 از تامین بابت لغو 1405-ف-000002",
+   "status": "posted",
+   "source": "system",
+   "ref": "supplier-refund-3",
+   "debit": 8,
+   "credit": 8,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 8,
+     "c": 0
+    },
+    {
+     "code": "5101",
+     "name": "بهای تمام‌شده‌ی خدمات",
+     "d": 0,
+     "c": 8
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "entry_no": "1405-000025",
+   "date": "2026-10-20",
+   "desc": "جریمه تامین 1 بابت لغو 1405-ف-000002",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-sup-3",
+   "debit": 1,
+   "credit": 1,
+   "lines": [
+    {
+     "code": "2101-0001",
+     "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+     "d": 1,
+     "c": 0
+    },
+    {
+     "code": "4108",
+     "name": "درآمد جریمه از تامین‌کننده — لغو خرید",
+     "d": 0,
+     "c": 1
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "entry_no": "1405-000026",
+   "date": "2026-10-20",
+   "desc": "فاکتور فروش 1405-ف-000003 — مشتری آزمون منفی — سناریو",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-ف-000003",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "4103",
+     "name": "درآمد خدمات ویزا و سایر خدمات",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 27,
+   "entry_no": "1405-000027",
+   "date": "2026-10-20",
+   "desc": "فاکتور فروش 1405-ف-000004 — مشتری آزمون منفی — سناریو",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-ف-000004",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "4103",
+     "name": "درآمد خدمات ویزا و سایر خدمات",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 28,
+   "entry_no": "1405-000028",
+   "date": "2026-10-20",
+   "desc": "دریافت 1405-د-000005 از مشتری آزمون منفی — سناریو",
+   "status": "posted",
+   "source": "system",
+   "ref": "1405-د-000005",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "110201",
+     "name": "بانک ملت — حساب جاری",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 29,
+   "entry_no": "1405-000029",
+   "date": "2026-10-20",
+   "desc": "لغو جزئی 10 از فاکتور 1405-ف-000004",
+   "status": "posted",
+   "source": "system",
+   "ref": "partial-cancel-4",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "4103",
+     "name": "درآمد خدمات ویزا و سایر خدمات",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 30,
+   "entry_no": "1405-000030",
+   "date": "2026-10-20",
+   "desc": "جریمه لغو مشتری 10 فاکتور 1405-ف-000004",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-cust-4",
+   "debit": 10,
+   "credit": 10,
+   "lines": [
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 10,
+     "c": 0
+    },
+    {
+     "code": "4107",
+     "name": "درآمد جریمه از مشتری — لغو خدمات",
+     "d": 0,
+     "c": 10
+    }
+   ]
+  },
+  {
+   "id": 31,
+   "entry_no": "1405-000031",
+   "date": "2026-10-20",
+   "desc": "لغو جزئی 4 از فاکتور 1405-ف-000003",
+   "status": "posted",
+   "source": "system",
+   "ref": "partial-cancel-5",
+   "debit": 4,
+   "credit": 4,
+   "lines": [
+    {
+     "code": "4103",
+     "name": "درآمد خدمات ویزا و سایر خدمات",
+     "d": 4,
+     "c": 0
+    },
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 0,
+     "c": 4
+    }
+   ]
+  },
+  {
+   "id": 32,
+   "entry_no": "1405-000032",
+   "date": "2026-10-20",
+   "desc": "جریمه لغو مشتری 4 فاکتور 1405-ف-000003",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-cust-5",
+   "debit": 4,
+   "credit": 4,
+   "lines": [
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 4,
+     "c": 0
+    },
+    {
+     "code": "4107",
+     "name": "درآمد جریمه از مشتری — لغو خدمات",
+     "d": 0,
+     "c": 4
+    }
+   ]
+  },
+  {
+   "id": 33,
+   "entry_no": "1405-000033",
+   "date": "2026-10-19",
+   "desc": "لغو جزئی 4 از فاکتور 1405-ف-000003",
+   "status": "posted",
+   "source": "system",
+   "ref": "partial-cancel-6",
+   "debit": 4,
+   "credit": 4,
+   "lines": [
+    {
+     "code": "4103",
+     "name": "درآمد خدمات ویزا و سایر خدمات",
+     "d": 4,
+     "c": 0
+    },
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 0,
+     "c": 4
+    }
+   ]
+  },
+  {
+   "id": 34,
+   "entry_no": "1405-000034",
+   "date": "2026-10-19",
+   "desc": "جریمه لغو مشتری 4 فاکتور 1405-ف-000003",
+   "status": "posted",
+   "source": "system",
+   "ref": "penalty-cust-6",
+   "debit": 4,
+   "credit": 4,
+   "lines": [
+    {
+     "code": "1103-0002",
+     "name": "مشتری آزمون منفی — سناریو",
+     "d": 4,
+     "c": 0
+    },
+    {
+     "code": "4107",
+     "name": "درآمد جریمه از مشتری — لغو خدمات",
+     "d": 0,
+     "c": 4
+    }
+   ]
+  }
+ ],
+ "account_sums": [
+  {
+   "code": "110201",
+   "name": "بانک ملت — حساب جاری",
+   "debit": 240,
+   "credit": 86,
+   "net": 154
+  },
+  {
+   "code": "1103-0001",
+   "name": "مشتری A — سناریو ۸ مرحله",
+   "debit": 150,
+   "credit": 150,
+   "net": 0
+  },
+  {
+   "code": "1103-0002",
+   "name": "مشتری آزمون منفی — سناریو",
+   "debit": 38,
+   "credit": 28,
+   "net": 10
+  },
+  {
+   "code": "1107",
+   "name": "مالیات بر ارزش افزوده — اعتبار مالیاتی",
+   "debit": 4,
+   "credit": 0,
+   "net": 4
+  },
+  {
+   "code": "2101-0001",
+   "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+   "debit": 87,
+   "credit": 74,
+   "net": 13
+  },
+  {
+   "code": "3101",
+   "name": "سرمایه",
+   "debit": 0,
+   "credit": 100,
+   "net": -100
+  },
+  {
+   "code": "4101",
+   "name": "درآمد فروش تور",
+   "debit": 50,
+   "credit": 100,
+   "net": -50
+  },
+  {
+   "code": "4103",
+   "name": "درآمد خدمات ویزا و سایر خدمات",
+   "debit": 18,
+   "credit": 20,
+   "net": -2
+  },
+  {
+   "code": "4107",
+   "name": "درآمد جریمه از مشتری — لغو خدمات",
+   "debit": 0,
+   "credit": 26,
+   "net": -26
+  },
+  {
+   "code": "4108",
+   "name": "درآمد جریمه از تامین‌کننده — لغو خرید",
+   "debit": 0,
+   "credit": 5,
+   "net": -5
+  },
+  {
+   "code": "5101",
+   "name": "بهای تمام‌شده‌ی خدمات",
+   "debit": 40,
+   "credit": 38,
+   "net": 2
+  }
+ ],
+ "trial": {
+  "total_debit": 627,
+  "total_credit": 627
+ },
+ "invoices": [
+  {
+   "id": 1,
+   "number": "1405-ف-000001",
+   "status": "issued",
+   "total_rial": 60,
+   "paid_rial": 20,
+   "description": "A1 — فاکتور فروش ۶۰"
+  },
+  {
+   "id": 2,
+   "number": "1405-ف-000002",
+   "status": "issued",
+   "total_rial": 40,
+   "paid_rial": 30,
+   "description": "A2 — فاکتور فروش ۴۰"
+  },
+  {
+   "id": 3,
+   "number": "1405-ف-000003",
+   "status": "issued",
+   "total_rial": 10,
+   "paid_rial": 2,
+   "description": "W1 — فاکتور آزمون منفی ۱۰ (ویزا)"
+  },
+  {
+   "id": 4,
+   "number": "1405-ف-000004",
+   "status": "issued",
+   "total_rial": 10,
+   "paid_rial": 0,
+   "description": "CX — فاکتور هم‌زمانی ۱۰ (ویزا)"
+  }
+ ],
+ "bills": [
+  {
+   "id": 1,
+   "number": "1405-خ-000001",
+   "status": "issued",
+   "net_rial": 40,
+   "vat_rial": 4,
+   "total_rial": 44,
+   "paid_rial": 44
+  }
+ ],
+ "partials": [
+  {
+   "id": 1,
+   "invoice_id": 1,
+   "doc_date": "2026-10-20",
+   "amount_rial": 25,
+   "penalty_customer_rial": 5,
+   "supplier_refund_rial": 20,
+   "penalty_supplier_rial": 3,
+   "reason": "انصراف یک بخش از سفر — لغو جزئی اول A1",
+   "entry_id": 9,
+   "penalty_entry_id": 10,
+   "refund_id": 5,
+   "supplier_entry_id": 12,
+   "supplier_refund_entry_id": 12,
+   "supplier_penalty_entry_id": 13,
+   "supplier_refund_vat_rial": 0,
+   "created_by": 1,
+   "created_at": "2026-10-20 14:06:49.777532"
+  },
+  {
+   "id": 2,
+   "invoice_id": 1,
+   "doc_date": "2026-10-20",
+   "amount_rial": 15,
+   "penalty_customer_rial": 2,
+   "supplier_refund_rial": 10,
+   "penalty_supplier_rial": 1,
+   "reason": "ادامه انصراف — لغو جزئی دوم A1",
+   "entry_id": 14,
+   "penalty_entry_id": 15,
+   "refund_id": 6,
+   "supplier_entry_id": 17,
+   "supplier_refund_entry_id": 17,
+   "supplier_penalty_entry_id": 18,
+   "supplier_refund_vat_rial": 0,
+   "created_by": 1,
+   "created_at": "2026-10-20 14:06:49.845348"
+  },
+  {
+   "id": 3,
+   "invoice_id": 2,
+   "doc_date": "2026-10-20",
+   "amount_rial": 10,
+   "penalty_customer_rial": 1,
+   "supplier_refund_rial": 8,
+   "penalty_supplier_rial": 1,
+   "reason": "لغو بخشی از A2 — انصراف یک نفر از سفر دوم",
+   "entry_id": 21,
+   "penalty_entry_id": 22,
+   "refund_id": 8,
+   "supplier_entry_id": 24,
+   "supplier_refund_entry_id": 24,
+   "supplier_penalty_entry_id": 25,
+   "supplier_refund_vat_rial": 0,
+   "created_by": 1,
+   "created_at": "2026-10-20 14:06:49.998872"
+  },
+  {
+   "id": 4,
+   "invoice_id": 4,
+   "doc_date": "2026-10-20",
+   "amount_rial": 10,
+   "penalty_customer_rial": 10,
+   "supplier_refund_rial": 0,
+   "penalty_supplier_rial": 0,
+   "reason": "لغو هم‌زمان CX رشته‌۱",
+   "entry_id": 29,
+   "penalty_entry_id": 30,
+   "refund_id": null,
+   "supplier_entry_id": null,
+   "supplier_refund_entry_id": null,
+   "supplier_penalty_entry_id": null,
+   "supplier_refund_vat_rial": 0,
+   "created_by": 1,
+   "created_at": "2026-10-20 14:06:50.204159"
+  },
+  {
+   "id": 5,
+   "invoice_id": 3,
+   "doc_date": "2026-10-20",
+   "amount_rial": 4,
+   "penalty_customer_rial": 4,
+   "supplier_refund_rial": 0,
+   "penalty_supplier_rial": 0,
+   "reason": "آزمون لغو از فاکتور تسویه‌نشده (بدون دریافت)",
+   "entry_id": 31,
+   "penalty_entry_id": 32,
+   "refund_id": null,
+   "supplier_entry_id": null,
+   "supplier_refund_entry_id": null,
+   "supplier_penalty_entry_id": null,
+   "supplier_refund_vat_rial": 0,
+   "created_by": 1,
+   "created_at": "2026-10-20 14:06:50.288496"
+  },
+  {
+   "id": 6,
+   "invoice_id": 3,
+   "doc_date": "2026-10-19",
+   "amount_rial": 4,
+   "penalty_customer_rial": 4,
+   "supplier_refund_rial": 0,
+   "penalty_supplier_rial": 0,
+   "reason": "همان مبلغ ولی تاریخ و دلیل متفاوت — باید پذیرفته شود",
+   "entry_id": 33,
+   "penalty_entry_id": 34,
+   "refund_id": null,
+   "supplier_entry_id": null,
+   "supplier_refund_entry_id": null,
+   "supplier_penalty_entry_id": null,
+   "supplier_refund_vat_rial": 0,
+   "created_by": 1,
+   "created_at": "2026-10-20 14:06:50.308875"
+  }
+ ],
+ "settlements": [
+  {
+   "id": 1,
+   "number": "1405-د-000001",
+   "direction": "in",
+   "amount_rial": 25,
+   "status": "issued",
+   "description": "دریافت از مشتری A — 25",
+   "allocated": 0
+  },
+  {
+   "id": 2,
+   "number": "1405-د-000002",
+   "direction": "in",
+   "amount_rial": 35,
+   "status": "issued",
+   "description": "دریافت از مشتری A — 35",
+   "allocated": 20
+  },
+  {
+   "id": 3,
+   "number": "1405-د-000003",
+   "direction": "in",
+   "amount_rial": 20,
+   "status": "issued",
+   "description": "دریافت از مشتری A — 20",
+   "allocated": 10
+  },
+  {
+   "id": 4,
+   "number": "1405-پ-000001",
+   "direction": "out",
+   "amount_rial": 44,
+   "status": "issued",
+   "description": "پرداخت فاکتور تأمین S1 — ۴۴",
+   "allocated": 44
+  },
+  {
+   "id": 5,
+   "number": "1405-پ-000002",
+   "direction": "out",
+   "amount_rial": 20,
+   "status": "issued",
+   "description": "استرداد لغو جزئی 1405-ف-000001",
+   "allocated": 0
+  },
+  {
+   "id": 6,
+   "number": "1405-پ-000003",
+   "direction": "out",
+   "amount_rial": 13,
+   "status": "issued",
+   "description": "استرداد لغو جزئی 1405-ف-000001",
+   "allocated": 0
+  },
+  {
+   "id": 7,
+   "number": "1405-د-000004",
+   "direction": "in",
+   "amount_rial": 20,
+   "status": "issued",
+   "description": "دریافت جدید ۲۰ — تخصیص هدفمند به A2",
+   "allocated": 20
+  },
+  {
+   "id": 8,
+   "number": "1405-پ-000004",
+   "direction": "out",
+   "amount_rial": 9,
+   "status": "issued",
+   "description": "استرداد لغو جزئی 1405-ف-000002",
+   "allocated": 0
+  },
+  {
+   "id": 9,
+   "number": "1405-د-000005",
+   "direction": "in",
+   "amount_rial": 10,
+   "status": "issued",
+   "description": "دریافت CX — کنترل هم‌زمانی",
+   "allocated": 2
+  }
+ ],
+ "allocations": [
+  {
+   "id": 2,
+   "settlement_id": 2,
+   "target_type": "invoice",
+   "target_id": 1,
+   "amount_rial": 20
+  },
+  {
+   "id": 3,
+   "settlement_id": 3,
+   "target_type": "invoice",
+   "target_id": 2,
+   "amount_rial": 10
+  },
+  {
+   "id": 4,
+   "settlement_id": 4,
+   "target_type": "bill",
+   "target_id": 1,
+   "amount_rial": 44
+  },
+  {
+   "id": 5,
+   "settlement_id": 7,
+   "target_type": "invoice",
+   "target_id": 2,
+   "amount_rial": 20
+  },
+  {
+   "id": 6,
+   "settlement_id": 9,
+   "target_type": "invoice",
+   "target_id": 3,
+   "amount_rial": 2
+  }
+ ],
+ "parties": [
+  {
+   "id": 1,
+   "code": "م-00001",
+   "name": "مشتری A — سناریو ۸ مرحله",
+   "kind": "both",
+   "account_id": 52
+  },
+  {
+   "id": 2,
+   "code": "ت-00001",
+   "name": "تأمین‌کننده S1 — سناریو ۸ مرحله",
+   "kind": "supplier",
+   "account_id": 53
+  },
+  {
+   "id": 3,
+   "code": "م-00002",
+   "name": "مشتری آزمون منفی — سناریو",
+   "kind": "customer",
+   "account_id": 54
+  }
+ ]
+}

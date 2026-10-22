@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0b1319" />
+  <meta name="description" content="سامانه‌ی حسابداری آژانس مسافرتی — دفتر روزنامه، خزانه‌داری، فروش خدمات، حقوق و دستمزد، دارایی ثابت و صورت‌های مالی" />
+  <title>سامانه‌ی حسابداری آژانس مسافرتی</title>
+  <link rel="icon" href="/static/favicon.svg" />
+  <link rel="preload" href="/static/fonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/static/fonts/Vazirmatn-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/static/fonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- برای کسی که با کیبورد کار می‌کند: مستقیم بپر سر محتوای صفحه -->
+  <a class="skip-link" href="#view">پرش به محتوای صفحه</a>
+
+  <!-- ===================== صفحه‌ی ورود ===================== -->
+  <div id="login-screen" class="login-wrap">
+    <form id="login-form" class="login-card">
+      <!-- ستون معرفی (سمت راست) -->
+      <div class="login-side">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" width="100%" height="100%">
+              <path d="M14 33V15h6.5c5 0 8 2.6 8 7.2 0 3-1.4 5.1-3.8 6.2L28 33h-5l-3-4h-1.5v4H14zm4.5-8H20c2.2 0 3.6-1 3.6-3s-1.4-3-3.6-3h-1.5v6z" fill="#fff"/>
+              <circle cx="34" cy="18" r="2.6" fill="var(--brand-300)"/>
+            </svg>
+          </span>
+          <span class="brand-text">
+            <strong>سامانه‌ی حسابداری آژانس مسافرتی</strong>
+            <span>دفتر و حساب‌های آژانس، یک‌جا و به‌روز</span>
+          </span>
+        </div>
+
+        <p class="lead">
+          همه‌ی کارهای حسابداری آژانس — از سند روزنامه تا حقوق کارکنان و صورت‌های مالی —
+          در یک برنامه‌ی فارسی ساده.
+        </p>
+
+        <ul class="feat">
+          <li>
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M10 1.6 3 4.6v5.1c0 4.2 2.9 7.6 7 8.7 4.1-1.1 7-4.5 7-8.7V4.6L10 1.6Zm3.7 6.6-4.2 4.6a1 1 0 0 1-1.5 0L6.3 10.6l1.5-1.3 1 1.2 3.5-3.8 1.4 1.5Z"/></svg>
+            <span>سند ناتراز هرگز نهایی نمی‌شود؛ حساب‌ها همیشه تراز می‌مانند.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M9 2h2v8.6l3.1-3.1 1.4 1.4L10 14.4 4.5 8.9l1.4-1.4L9 10.6V2ZM4 16h12v2H4v-2Z"/></svg>
+            <span>خروجی اکسل همه‌ی گزارش‌ها، برای فرستادن به حسابرس.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M10 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 9.5c3.6 0 6.5 2 6.5 4.5v2h-13v-2c0-2.5 2.9-4.5 6.5-4.5Z"/></svg>
+            <span>برای حسابدار، کارکنان و کارفرما حساب جدا با دسترسی جدا.</span>
+          </li>
+        </ul>
+
+        <p class="foot">استفاده فقط برای کاربران مجاز این سامانه امکان‌پذیر است.</p>
+      </div>
+
+      <!-- ستون فرم ورود (سمت چپ) -->
+      <div class="login-form">
+        <div class="login-head">
+          <h2>ورود به برنامه</h2>
+          <p>نام کاربری و رمز خود را بنویسید.</p>
+        </div>
+
+        <label>نام کاربری
+          <input id="login-username" autocomplete="username" autocapitalize="off" spellcheck="false" required />
+        </label>
+        <label>رمز
+          <input id="login-password" type="password" autocomplete="current-password" required />
+        </label>
+
+        <button type="submit" class="btn primary wide lg">ورود</button>
+        <p id="login-error" class="error-text" role="alert" aria-live="polite"></p>
+
+        <div class="hint">
+          <strong>ورود امن</strong>
+          <span>نام کاربری و رمز را از مدیر سامانه دریافت کنید. برای نسخه‌ی نمایشی، فایل رمزهای موقت فقط در پوشه‌ی داده‌ی محلی ساخته می‌شود.</span>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===================== خود برنامه ===================== -->
+  <div id="app" class="app hidden">
+    <div id="drawer-back" class="drawer-back" hidden></div>
+
+    <header class="classic-header">
+      <div class="classic-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="100%" height="100%">
+            <path d="M12 28V13h5.4c4.2 0 6.7 2.2 6.7 6 0 2.5-1.2 4.3-3.2 5.2l2.2 3.8h-4.2l-1.9-3.3h-1.6V28H12zm3.4-6.6h1.4c1.9 0 3-.9 3-2.5s-1.1-2.5-3-2.5h-1.4v5z" fill="#fff"/>
+            <circle cx="28.5" cy="15.5" r="2.2" fill="var(--brand-300)"/>
+          </svg>
+        </span>
+        <span class="classic-brand-copy"><strong>حسابداری آژانس</strong><span>دفتر مالی و خدمات سفر</span></span>
+      </div>
+      <div class="classic-title"><strong>سامانه‌ی حسابداری</strong><span>حسابداری آژانس مسافرتی</span></div>
+      <div class="classic-account">
+        <div id="side-user" class="side-user"></div>
+        <button id="btn-password" class="btn classic-action small" title="تغییر رمز">تغییر رمز</button>
+        <button id="btn-logout" class="btn classic-action danger small" title="خروج">خروج</button>
+      </div>
+    </header>
+
+    <nav id="ribbon-nav" class="module-ribbon" aria-label="دسترسی سریع به بخش‌ها"></nav>
+
+    <div class="app-workspace">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-label"><span class="sidebar-label-icon">▦</span><span>تقویم و بخش‌ها</span></div>
+        <div id="mini-calendar" class="mini-calendar" aria-label="تقویم شمسی"></div>
+        <div class="nav-filter">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8.5 3a5.5 5.5 0 1 0 3.4 9.8l3.6 3.6 1.4-1.4-3.6-3.6A5.5 5.5 0 0 0 8.5 3Zm0 2a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z"/></svg>
+          <input id="nav-filter" type="search" placeholder="جست‌وجوی صفحه…" aria-label="پیدا کردن صفحه در منو"
+                 autocomplete="off" spellcheck="false" />
+          <kbd id="nav-filter-key">Ctrl+K</kbd>
+        </div>
+        <nav id="nav" aria-label="همه‌ی صفحه‌های برنامه"></nav>
+        <div class="sidebar-help">برای دیدن همه‌ی گزینه‌ها از جست‌وجو یا کلیدهای Ctrl+K استفاده کنید.</div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div class="top-start">
+            <button id="btn-drawer" class="icon-btn menu-btn" aria-label="نمایش تقویم و منو" aria-expanded="false" aria-controls="sidebar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"/></svg>
+            </button>
+            <div class="page-head"><h2 id="page-title">داشبورد</h2></div>
+          </div>
+          <div class="top-end">
+            <div id="top-info" class="chip"></div>
+            <button id="btn-theme" class="icon-btn" aria-label="تغییر حالت روز و شب" title="حالت روز / شب">
+              <svg class="ico-sun" viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-13V2h0v2Zm0 18v-2h0v2ZM4 12H2h2Zm18 0h-2 2ZM5.6 5.6 4.2 4.2l1.4 1.4Zm12.8 12.8 1.4 1.4-1.4-1.4ZM18.4 5.6l1.4-1.4-1.4 1.4ZM5.6 18.4l-1.4 1.4 1.4-1.4Z"/></svg>
+              <svg class="ico-moon" viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M21 13.2A9 9 0 0 1 10.8 3a9 9 0 1 0 10.2 10.2Z"/></svg>
+            </button>
+          </div>
+        </header>
+        <section id="view" tabindex="-1"></section>
+      </main>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+
+  <noscript>
+    <div class="card" style="max-width:600px;margin:40px auto;text-align:center">
+      برای استفاده از برنامه، جاوااسکریپت مرورگر باید روشن باشد.
+    </div>
+  </noscript>
+  <script src="/static/app.js"></script>
+</body>
+</html>

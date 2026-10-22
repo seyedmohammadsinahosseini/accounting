@@ -1,0 +1,24 @@
+[Unit]
+Description=Agency Accounting web application
+After=network.target
+
+[Service]
+Type=simple
+User=agency-accounting
+Group=agency-accounting
+WorkingDirectory=/opt/agency-accounting
+EnvironmentFile=/etc/agency-accounting.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
+ExecStart=/opt/agency-accounting/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/agency-accounting
+
+[Install]
+WantedBy=multi-user.target

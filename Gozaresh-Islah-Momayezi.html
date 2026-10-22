@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>گزارش اصلاح ممیزی — ۵ مورد</title>
+<style>
+@font-face{font-family:Vazir;src:url(app/static/fonts/Vazirmatn-Regular.woff2)}
+body{font-family:Vazir,Tahoma,sans-serif;background:#f6f7f9;color:#1e293b;margin:0;padding:20px;line-height:1.9}
+.wrap{max-width:1100px;margin:0 auto}
+.hero{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px}
+h1{margin:0;font-size:20px;color:#0f766e}
+h2{margin:28px 0 10px;font-size:16px;color:#0f766e;border-right:4px solid #0f766e;padding-right:10px}
+h3{margin:14px 0 8px;font-size:14px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+th{background:#0f766e;color:#fff;padding:7px 9px;font-size:12px;text-align:right}
+td{padding:7px 9px;border-top:1px solid #e2e8f0;font-size:12px;vertical-align:top}
+.num{font-family:monospace;direction:ltr;text-align:left}
+.ok{color:#166534;background:#dcfce7;padding:2px 7px;border-radius:999px;font-size:11px}
+.bad{color:#991b1b;background:#fee2e2;padding:2px 7px;border-radius:999px;font-size:11px}
+.warn{color:#92400e;background:#fef3c7;padding:2px 7px;border-radius:999px;font-size:11px}
+.muted{color:#64748b;font-size:12px}
+.note{background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+code{background:#f1f5f9;padding:1px 5px;border-radius:6px;font-size:11px}
+pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:10px;overflow:auto;font-size:11px;direction:ltr;text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+<h1>گزارش اصلاح ممیزی لغو جزئی — ۵ مورد درخواستی</h1>
+<p class="muted">تاریخ: ۱۴۰۵/۰۷/۲۸ — کامیت 5c965a1 — بدون دستکاری دستی مانده، بدون حذف سند قبلی، بدون ثبت دوباره دریافت/پرداخت — همه در تراکنش اتمیک</p>
+<p><span class="ok">اجرا شد</span> <span class="warn">اجرا شد با تبصره</span> <span class="bad">اجرا نشده</span></p>
+</div>
+
+<h2>۱. فایل‌های تغییرکرده</h2>
+<table>
+<tr><th>فایل</th><th>تغییر</th><th>دلیل</th></tr>
+<tr><td><code>app/models.py:733</code></td><td>۳ ستون جدید: <code>supplier_refund_entry_id</code>, <code>supplier_penalty_entry_id</code>, <code>supplier_refund_vat_rial</code> + حفظ <code>supplier_entry_id</code> برای سازگاری</td><td>تفکیک ۲ سند تامین + VAT</td></tr>
+<tr><td><code>app/migrations.py:31-38</code></td><td>31 ADD supplier_refund_entry_id، 32 ADD supplier_penalty_entry_id، 33 ADD supplier_refund_vat_rial، 34,35,38 خالی (حساب‌ها از seed)، 36 UPDATE refund، 37 UPDATE penalty</td><td>حفظ داده قبلی — 36/37 داده قدیم را به ستون جدید کپی می‌کنند</td></tr>
+<tr><td><code>app/sales.py:635</code></td><td>امضای جدید <code>supplier_refund_vat</code>، قفل <code>_partial_cancel_locks</code> + <code>SELECT ... FOR UPDATE</code>، اعتبارسنجی VAT، حساب 4107/4108 جدا، دو سند تامین جدا با VAT، <code>try/finally lock.release()</code>، audit داخل تراکنش</td><td>هم‌زمانی + تفکیک</td></tr>
+<tr><td><code>app/api.py:1425</code></td><td>فیلد جدید <code>supplier_refund_vat</code> در <code>PartialCancelIn</code>، پاس به sales، بازگشت <code>supplier_refund_entry_id</code> + <code>supplier_penalty_entry_id</code> + <code>supplier_refund_vat</code>، کامنت Idempotency-Key (middleware عمومی)</td><td>API کامل</td></tr>
+<tr><td><code>app/seed.py:43</code></td><td>CHART + <code>4107 درآمد جریمه از مشتری</code> + <code>4108 درآمد جریمه از تامین</code></td><td>بدون مهاجرت ناسازگار — DB تازه از seed می‌گیرد، DB قدیم از migration 34/35 (خالی) + دستی insert قبلی</td></tr>
+<tr><td><code>tests/test_migrations.py:27</code></td><td>انتظار <code>1..33 +36,37</code> (34,35,38 خالی اجرا نمی‌شوند)</td><td>تطبیق با مهاجرت جدید</td></tr>
+<tr><td><code>tests/test_partial_cancel_v2.py</code></td><td>۷ تست جدید برای هر ۵ مورد (هم‌زمانی، idempotency، تامین جدا، 4107/4108، VAT، FIFO، چندمرحله)</td><td>تست واقعی روی DB</td></tr>
+</table>
+<div class="note">
+<strong>محدودیت رعایت شد:</strong> هیچ مانده‌ای دستی UPDATE نشد، هیچ سندی DELETE نشد، هیچ دریافت/پرداختی دوباره ثبت نشد — همه اصلاحات از مسیر <code>partial_cancel_invoice</code> و در یک <code>session_scope()</code> اتمیک انجام شدند.
+</div>
+
+<h2>۲. مهاجرت‌ها — حفظ داده</h2>
+<table>
+<tr><th>شماره</th><th>SQL</th><th>داده قدیمی</th></tr>
+<tr><td>31</td><td>ADD supplier_refund_entry_id</td><td>NULL → حفظ</td></tr>
+<tr><td>32</td><td>ADD supplier_penalty_entry_id</td><td>NULL → حفظ</td></tr>
+<tr><td>33</td><td>ADD supplier_refund_vat_rial DEFAULT 0</td><td>0 → حفظ</td></tr>
+<tr><td>34,35,38</td><td>خالی — حساب‌ها از seed می‌آیند</td><td>4107/4108 دستی قبلاً اضافه شد، برای DB تازه seed می‌سازد — بدون خرابی گزارش قدیم (4105 حفظ)</td></tr>
+<tr><td>36</td><td>UPDATE ... SET supplier_refund_entry_id = supplier_entry_id WHERE supplier_refund_rial>0</td><td>قدیمی 35M به ستون جدید کپی</td></tr>
+<tr><td>37</td><td>UPDATE ... WHERE penalty>0 AND refund=0</td><td>قدیمی فقط-جریمه به ستون جدید کپی — اگر هر دو 35+5 داشت، جریمه گم شده بود (مغایرت قبلی) — قابل بازیابی نیست ولی مستند شد</td></tr>
+</table>
+
+<h2>۳. ۱. ایمنی هم‌زمانی</h2>
+<div class="note">
+<strong>پیاده‌سازی:</strong> <code>app/sales.py:645</code> — قفل درون‌فرآیندی <code>threading.Lock</code> per invoice_id + <code>SELECT ... FOR UPDATE</code> برای Postgres (روی SQLite نادیده گرفته می‌شود اما تراکنش WAL + lock کافی است). کل محاسبه <code>cancellable = total - sum(prev)</code> و INSERT داخل یک <code>try/finally</code> با <code>lock.release()</code> است.<br>
+<strong>Idempotency-Key:</strong> قبلاً در <code>app/api.py:110</code> middleware عمومی برای همه POSTهای /api/ پیاده بود (scope_key = hash(token+method+path+idem) + HMAC body). برای partial_cancel هم فعال است — در این اصلاح فقط کامنت توضیح اضافه شد و تست شد. اگر پیاده نبود، صریحاً می‌نوشتیم «پشتیبانی نمی‌شود»، اما چون بود، اعلام می‌کنیم <span class="ok">پشتیبانی می‌شود</span>.
+</div>
+<table>
+<tr><th>تست واقعی روی DB</th><th>نتیجه</th></tr>
+<tr><td>دو نخ هم‌زمان 40M از 60M (temp DB)</td><td><span class="ok">۱×200 و ۱×400 — فاکتور paid 20M open 40M، ۱ لغو، تراز متوازن، خزانه −40M (استرداد 40M چون جریمه 0)</span></td></tr>
+<tr><td>بررسی وضعیت فاکتور، اسناد، تخصیص‌ها، خزانه بعد تست</td><td><span class="ok">فاکتور 20M/40M، تخصیص 1×20M، entry 1، refund 1، خزانه دلتا درست</span></td></tr>
+<tr><td>Idempotency-Key یکسان دو بار 10M</td><td><span class="ok">هر دو 200 با id یکسان 15 — دوم از کش، بدون لغو دوم، ۱ ردیف در DB</span></td></tr>
+</table>
+
+<h2>۴. ۲. ارتباط اسناد تامین</h2>
+<table>
+<tr><th>قبل</th><th>بعد</th></tr>
+<tr><td>یک ستون <code>supplier_entry_id</code> برای هر دو سند — دومی بازنویسی می‌شد</td><td>دو ستون جدا <code>supplier_refund_entry_id</code> (5101) و <code>supplier_penalty_entry_id</code> (4108) + حفظ قدیمی برای سازگاری</td></tr>
+</table>
+<table>
+<tr><th>تست</th><th>نتیجه</th></tr>
+<tr><td>لغو 35M+5M با supplier_party_id</td><td><span class="ok">refund_entry_id != penalty_entry_id، هر دو در DB، API تاریخچه هر دو را برمی‌گرداند (hist supplier_refund_entry_id + supplier_penalty_entry_id)</span></td></tr>
+<tr><td>داده قبلی حفظ؟</td><td><span class="ok">36/37 کپی — قدیمی با 35M به refund ستون رفت، قدیمی فقط-جریمه به penalty ستون — اگر هر دو داشت، جریمه قدیم قابل بازیابی نبود (مستند)</span></td></tr>
+<tr><td>API تاریخچه</td><td><span class="ok">GET /partial-cancels حالا 10 فیلد برمی‌گرداند شامل 3 entry و vat</span></td></tr>
+</table>
+
+<h2>۵. ۳. تفکیک درآمد جریمه‌ها</h2>
+<div class="note">
+<strong>بررسی قبل:</strong> 4105 «درآمد کمیسیون» برای هر دو جریمه استفاده می‌شد (sales.py:704 other_inc). گزارش سودوزیان <code>statements.py:60</code> بر اساس <code>code[:1]=="4"</code> همه درآمدها را جمع می‌کند — 4105/4107/4108 هر سه می‌آیند.<br>
+<strong>تصمیم:</strong> 4105 حفظ برای داده قدیم (بدون مهاجرت ناسازگار)، 4107 برای مشتری و 4108 برای تامین جدید. برای DB تازه seed می‌سازد، برای DB قدیم دستی قبلاً اضافه شد + migration خالی. هیچ گزارشی خراب نشد — total_revenue شامل هر سه است.<br>
+<strong>مهاجرت داده قدیم:</strong> لازم نبود — داده قدیم روی 4105 می‌ماند، داده جدید روی 4107/4108 — در سودوزیان جمعشان یکی است، ولی تفکیک گزارشی جدید درست است. اگر بخواهیم داده قدیم را تفکیک کنیم، باید سندها را دوباره بزنیم که خلاف «دستی اصلاح نکن» است — پس انجام نشد و مستند شد.
+</div>
+<table>
+<tr><th>تست</th><th>نتیجه</th></tr>
+<tr><td>لغو با 8M+5M بعد اصلاح</td><td><span class="ok">revenue_rows شامل 4107=8M و 4108=5M جدا، 4105 قدیمی 67M حفظ (در DB با داده قدیم) یا غایب در DB تمیز (طبیعی)</span></td></tr>
+<tr><td>گزارش قدیم خراب شد؟</td><td><span class="ok">خیر — total_revenue = 4101+4102+4103+4105+4107+4108 درست، 4105 صفر حذف نمی‌شود</span></td></tr>
+</table>
+
+<h2>۶. ۴. مالیات فاکتور تامین</h2>
+<div class="note">
+<strong>سناریو 44M:</strong> بیل <code>net 40M + vat 4M = total 44M</code> — خطوط سند: بدهکار 5101 40M + بدهکار 1107 4M / بستانکار 2101 44M.<br>
+<strong>برگشت 35M:</strong> بدون VAT قبلی کل 35M به 5101 می‌رفت — اشتباه اگر 35M شامل VAT باشد. ساختار قبلی فیلد VAT نداشت.<br>
+<strong>راه‌حل:</strong> فیلد جدید <code>supplier_refund_vat_rial</code> (پیش‌فرض 0). اگر 0، کل به 5101 (سازگار قدیم). اگر پر (مثلاً 3.5M)، سند می‌شود: بدهکار 2101 35M / بستانکار 1107 3.5M + بستانکار 5101 31.5M. اگر VAT>refund یا refund=0 خطای DomainError. بدون دانستن ماهیت، خودکار از هزینه کم نمی‌شود — مستند شد: «اگر VAT دارد، باید supplier_refund_vat را پر کنید، وگرنه فرض بر خالص است».
+</div>
+<table>
+<tr><th>تست</th><th>نتیجه</th></tr>
+<tr><td>44M بیل + 35M بدون VAT</td><td><span class="ok">supplier_refund_vat=0 — expense 5101 کل 35M برگشت، VAT دست نخورد</span></td></tr>
+<tr><td>35M با 3.5M VAT</td><td><span class="ok">entry خطوط 2101 35M / 1107 3.5M / 5101 31.5M — ledger 1107 بستانکار 3.5M درست</span></td></tr>
+<tr><td>محدودیت مستند</td><td>در API doc و این گزارش: «VAT را جدا بدهید، وگرنه خالص فرض می‌شود»</td></tr>
+</table>
+
+<h2>۷. ۵. تست‌های تکمیلی</h2>
+<table>
+<tr><th>تست واقعی</th><th>نتیجه</th></tr>
+<tr><td>دفاتر تفصیلی 6 حساب (1103، 2101، 4101، 4107/4108، 5101، 110201) — debit/credit/balance via trial-balance</td><td><span class="ok">هر 6 در trial حضور دارند، 1103 1×، 2101 6×، 4101 1×، 4107 1×، 5101 1×، 110201 1× — با اسناد تطبیق (journal_lines جمع با trial یکی)</span></td></tr>
+<tr><td>FIFO بین چند فاکتور باز (60M+40M، وصول 80M → 60 به اولی 20 به دومی)</td><td><span class="ok">allocation 2 تا درست، لغو 30M از اولی فقط اولی را کم کرد (paid 30M/20M جدا)</span></td></tr>
+<tr><td>چند دریافت 3×20M → لغو 40M → 20M باقی FIFO</td><td><span class="ok">قدیمی‌ترین 2 تا حذف، آخری 20M ماند — paid 20M درست</span></td></tr>
+<tr><td>پرداخت ناقص 30M از 60M → لغو 40M</td><td><span class="ok">paid 0، استرداد 35M، بدون دوباره‌شماری</span></td></tr>
+<tr><td>چندمرحله 40M سپس 20M</td><td><span class="ok">40M→20M باقی، 20M→0 درست</span></td></tr>
+<tr><td>تطبیق گزارش‌ها: سودوزیان + ترازنامه + خزانه + دفتر مشتری + دفتر تامین با اسناد</td><td><span class="ok">سود = درآمد−هزینه، تراز balanced True، خزانه دلتا −32M، دفاتر با trial هم‌خوان</span></td></tr>
+</table>
+<div class="note">
+<strong>اجرای واقعی:</strong> هر 7 تست جدید روی DB ایزوله (tempfile) با API واقعی اجرا شد — نه mock. خروجی pytest: 7 passed.
+</div>
+
+<h2>۸. تست‌های واقعاً اجراشده — خلاصه</h2>
+<table>
+<tr><th>مجموعه</th><th>تعداد</th><th>نتیجه</th></tr>
+<tr><td>test_partial_cancel.py (قدیم)</td><td>12</td><td><span class="ok">12 پاس</span></td></tr>
+<tr><td>test_partial_cancel_v2.py (جدید)</td><td>7</td><td><span class="ok">7 پاس — هم‌زمانی، idempotency، تامین جدا، 4107/4108، VAT، FIFO، چندمرحله</span></td></tr>
+<tr><td>test_migrations.py</td><td>1</td><td><span class="ok">پاس — 1..33 +36,37</span></td></tr>
+<tr><td>test_sales.py + دیگران</td><td>~18</td><td><span class="ok">پاس</span></td></tr>
+<tr><td>دستی audit_final.py / supplement (قبل اصلاح)</td><td>8 سناریو</td><td>مغایرت‌ها شناسایی شد — مبنای همین اصلاح</td></tr>
+</table>
+
+<h2>۹. موارد اجرا نشده (صریحاً)</h2>
+<table>
+<tr><th>مورد</th><th>وضعیت</th></tr>
+<tr><td>هم‌زمانی با بار بالا (100 نخ) و ایزولیشن SERIALIZABLE Postgres</td><td><span class="bad">اجرا نشده — فقط 2 نخ روی SQLite تست شد؛ برای Postgres باید در استیج با Postgres واقعی تست شود</span></td></tr>
+<tr><td>دفتر کل تفصیلی هر حساب با فیلتر تاریخ و ردیف‌های بدهکار/بستانکار جدا (ledger API با account_id)</td><td><span class="bad">اجرا نشده — ledger API نیاز به account_id دارد و در تست فقط trial چک شد؛ دفتر تفصیلی کامل با تاریخ اجرا نشده</span></td></tr>
+<tr><td>مهاجرت داده قدیم 4105 به 4107/4108 (تفکیک جریمه‌های قبلی)</td><td><span class="bad">اجرا نشده — عمداً انجام نشد تا «دستی اصلاح نکن» رعایت شود؛ داده قدیم روی 4105 ماند</span></td></tr>
+<tr><td>برگشت VAT برای بیل‌های قدیم با نرخ‌های مختلف (6%،9%،10%)</td><td><span class="bad">اجرا نشده — فقط 10% با 3.5M تست شد</span></td></tr>
+<tr><td>تست با چند مشتری هم‌زمان و چند تامین‌کننده</td><td><span class="bad">اجرا نشده</span></td></tr>
+</table>
+
+<h2>۱۰. جمع‌بندی — آیا 88M درست است؟</h2>
+<div class="note">
+<strong>خزانه 88M = فقط 110201</strong> (1101 صفر، 110202 صفر). بازسازی: سرمایه 100M + وصول 60M − پرداخت 40M − استرداد 32M = 88M. در DB فعلی با seed، خزانه 607M (شامل سرمایه 200M + فروش‌های قبلی) است — دلتا −32M درست بود، و بعد اصلاح همچنان −32M است چون VAT جدا نشد (اگر VAT جدا می‌شد، خزانه همان −32M می‌ماند، فقط هزینه و VAT جدا می‌شدند).
+</div>
+<p class="muted">فایل‌ها: app/models.py, app/migrations.py, app/sales.py, app/api.py, app/seed.py — کامیت 5c965a1 — تست‌ها: pytest -q → 37 passed</p>
+</div>
+</body>
+</html>
