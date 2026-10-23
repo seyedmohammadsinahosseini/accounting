@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, timedelta
 
 import threading
@@ -21,6 +22,11 @@ from . import dates as jd
 # قفل درون‌فرآیندی برای لغو جزئی — برای SQLite که FOR UPDATE ندارد
 _partial_cancel_locks: dict[int, threading.Lock] = {}
 _partial_cancel_locks_lock = threading.Lock()
+# قفل ساخت شخص: شماره‌گذاری کد شخص و حساب تفصیلی باید اتمیک باشد تا دو درخواست هم‌زمان
+# یا تکراری، حساب تفصیلی دوتایی نسازند (SQLite توالی متقاطع ندارد؛ تکیه بر unique کد کافی نیست
+# چون پیش از commit، نسخه‌ی رقیب دیده نمی‌شود). RLock است تا گردشی که کل تراکنش را قفل کرده
+# بتواند دوباره create_party را صدا بزند.
+_party_create_lock = threading.RLock()
 from . import services as svc
 from .models import (Account, Invoice, InvoiceLine, JournalEntry, Party, RecurringEntry,
                      Settlement, SettlementAllocation, SupplierBill, TaxRate, Trip)
@@ -31,7 +37,7 @@ SERVICE_TYPES = {
     "tour": {"label": "تور", "account": "revenue_tour"},
     "ticket": {"label": "بلیت", "account": "revenue_ticket"},
     "visa": {"label": "ویزا", "account": "revenue_other"},
-    "hotel": {"label": "اقامت", "account": "revenue_other"},
+    "hotel": {"label": "اقامت", "account": "revenue_hotel"},
     "transfer": {"label": "ترانسفر", "account": "revenue_other"},
     "insurance": {"label": "بیمه مسافرتی", "account": "revenue_other"},
     "commission": {"label": "کمیسیون", "account": "revenue_commission"},
@@ -40,6 +46,47 @@ SERVICE_TYPES = {
 
 PARTY_CODES = {"customer": SYSTEM_CODES["receivable"], "supplier": SYSTEM_CODES["payable"],
                "both": SYSTEM_CODES["receivable"], "employee": SYSTEM_CODES["employee_loan"]}
+
+
+# ------------------------------------------------------------------ تسویه‌ی ارزی (سبک)
+# سیاست: دفتر همچنان تک‌ارزی (ریالی) است. صورتحساب تأمین‌کننده می‌تواند داده‌ی ارزی داشته
+# باشد (مبلغ خارجی + نرخ دفتری) و تسویه هم ارز روز پرداخت را بگوید؛ فقط در همین نقطه‌ی
+# پرداخت، اختلاف واقع‌شده به‌صورت خودکار به درآمد ۴۱۱۱ / هزینه ۵۱۱۱ می‌رود. هر داده‌ای که
+# کامل نباشد با پیام فارسی متوقف می‌شود و هیچ ثبتی انجام نمی‌شود (هیچ گردی هم وارد دفتر
+# نمی‌شود: مبلغ ارزی × نرخ باید دقیقاً به ریال صحیح برسد).
+
+_FX_CODE_RE = re.compile(r"^[A-Z]{2,8}$")
+
+
+def _check_fx_inputs(currency: str | None, fx_amount_minor: int | None,
+                     fx_rate_rial: int | None) -> tuple[str, int, int]:
+    """اعتبارسنجی داده‌های ارزی. برمی‌گرداند: (کد ارز استاندارد، مبلغ خرد، نرخ ریالی).
+
+    مبلغ خرد = کوچک‌ترین واحد ارز (مثل سنتِ یورو)؛ نرخ = ریال به ازای یک واحد اصلی ارز.
+    اسناد کاملاً ریالی (IRR و صفرها) بدون خطا عبور می‌کنند.
+    """
+    code = (currency or "IRR").strip().upper()
+    amount = int(fx_amount_minor or 0)
+    rate = int(fx_rate_rial or 0)
+    if code == "IRR":
+        if amount != 0 or rate != 0:
+            raise DomainError("برای اسناد ریالی، مبلغ و نرخ ارزی را خالی بگذارید (کد ارز IRR).")
+        return "IRR", 0, 0
+    if not _FX_CODE_RE.match(code):
+        raise DomainError("کد ارز نامعتبر است؛ مثل EUR یا USD (حروف انگلیسی) وارد کنید.")
+    if amount <= 0:
+        raise DomainError("مبلغ ارزی باید بزرگ‌تر از صفر باشد (به واحد خرد ارز، مثلاً سنت یورو).")
+    if rate <= 0:
+        raise DomainError("نرخ ارز باید بزرگ‌تر از صفر باشد (ریال به ازای یک واحد اصلی، مثلاً ۱ یورو).")
+    if (amount * rate) % 100 != 0:
+        raise DomainError("مبلغ ارزی × نرخ به ریال صحیح نمی‌رسد؛ مبلغ یا نرخ را دقیق‌تر وارد کنید تا گردی در دفتر نیاید.")
+    return code, amount, rate
+
+
+def _fx_text(amount_minor: int) -> str:
+    """مبلغ ارزی برای نمایش در شرح‌ها — محاسبه‌ی حسابی با آن انجام نمی‌شود."""
+    whole, frac = divmod(amount_minor, 100)
+    return f"{whole:,}" + (f".{frac:02d}" if frac else "")
 
 
 # ------------------------------------------------------------------ نرخ مالیات
@@ -254,29 +301,30 @@ def create_party(sess, user, name: str, kind: str = "customer", phone: str = "",
     parent = svc.account_by_code(sess, parent_code)
     if parent is None:
         raise DomainError(f"حساب والد {parent_code} در کدینگ پیدا نشد.")
-    prefix = {"customer": "م", "supplier": "ت", "both": "م", "employee": "ک"}[kind]
-    same = sess.execute(select(func.count(Party.id)).where(Party.code.like(f"{prefix}-%"))).scalar() or 0
-    seq = same + 1
-    code = f"{prefix}-{seq:05d}"
-    while sess.execute(select(Party).where(Party.code == code)).scalar_one_or_none():
-        seq += 1
+    with _party_create_lock:
+        prefix = {"customer": "م", "supplier": "ت", "both": "م", "employee": "ک"}[kind]
+        same = sess.execute(select(func.count(Party.id)).where(Party.code.like(f"{prefix}-%"))).scalar() or 0
+        seq = same + 1
         code = f"{prefix}-{seq:05d}"
-    acc_seq = len([a for a in svc.list_accounts(sess) if a.parent_code == parent_code]) + 1
-    # کد حساب زیرمجموعه: کد والد + شماره، تا در کدینگ زیر همان حساب بنشیند
-    while svc.account_by_code(sess, f"{parent_code}-{acc_seq:04d}"):
-        acc_seq += 1
-    acc = svc.create_account(sess, user, f"{parent_code}-{acc_seq:04d}", f"{name}",
-                             parent.nature, parent_code,
-                             {"customer": "receivable", "both": "receivable",
-                              "supplier": "payable", "employee": "employee_loan"}[kind], ip)
-    party = Party(code=code, name=name, kind=kind, phone=phone.strip()[:30], note=note[:255],
-                  group_name=(tax or {}).get("group_name", "")[:80].strip(),
-                  account_id=acc.id, created_by=user.id)
-    _fill_party_tax(party, tax or {})
-    sess.add(party)
-    sess.flush()
-    svc.audit(sess, user, "party.create", "party", str(party.id), f"{code} {name}", ip)
-    return party
+        while sess.execute(select(Party).where(Party.code == code)).scalar_one_or_none():
+            seq += 1
+            code = f"{prefix}-{seq:05d}"
+        acc_seq = len([a for a in svc.list_accounts(sess) if a.parent_code == parent_code]) + 1
+        # کد حساب زیرمجموعه: کد والد + شماره، تا در کدینگ زیر همان حساب بنشیند
+        while svc.account_by_code(sess, f"{parent_code}-{acc_seq:04d}"):
+            acc_seq += 1
+        acc = svc.create_account(sess, user, f"{parent_code}-{acc_seq:04d}", f"{name}",
+                                 parent.nature, parent_code,
+                                 {"customer": "receivable", "both": "receivable",
+                                  "supplier": "payable", "employee": "employee_loan"}[kind], ip)
+        party = Party(code=code, name=name, kind=kind, phone=phone.strip()[:30], note=note[:255],
+                      group_name=(tax or {}).get("group_name", "")[:80].strip(),
+                      account_id=acc.id, created_by=user.id)
+        _fill_party_tax(party, tax or {})
+        sess.add(party)
+        sess.flush()
+        svc.audit(sess, user, "party.create", "party", str(party.id), f"{code} {name}", ip)
+        return party
 
 
 def update_party(sess, user, party_id: int, payload: dict, ip: str = "") -> Party:
@@ -1055,16 +1103,22 @@ def _credit_account_for(sess, user, party: Party, ip: str = "") -> Account:
     parent = svc.account_by_code(sess, "2103")
     if parent is None:
         raise DomainError("حساب ۲۱۰۳ (پیش‌دریافت از مشتریان) در کدینگ پیدا نشد.")
-    seq = len([a for a in svc.list_accounts(sess) if a.parent_code == "2103"]) + 1
-    while svc.account_by_code(sess, f"2103-{seq:04d}"):
-        seq += 1
-    acc = Account(code=f"2103-{seq:04d}", name=f"اعتبار مشتری — {party.name}", kind="ledger",
-                  nature="credit", parent_code="2103", level="detail", group_type="permanent",
-                  report_type="balance_sheet", report_group="advance_customer", is_system=False)
-    sess.add(acc)
-    sess.flush()
-    party.credit_account_id = acc.id
-    sess.flush()
+    with _party_create_lock:
+        # بازخوانی داخل قفل: ممکن است نسخه‌ی هم‌زمان، حساب اعتبار را همین‌حالا ساخته باشد
+        if party.credit_account_id:
+            acc = sess.get(Account, party.credit_account_id)
+            if acc is not None:
+                return acc
+        seq = len([a for a in svc.list_accounts(sess) if a.parent_code == "2103"]) + 1
+        while svc.account_by_code(sess, f"2103-{seq:04d}"):
+            seq += 1
+        acc = Account(code=f"2103-{seq:04d}", name=f"اعتبار مشتری — {party.name}", kind="ledger",
+                      nature="credit", parent_code="2103", level="detail", group_type="permanent",
+                      report_type="balance_sheet", report_group="advance_customer", is_system=False)
+        sess.add(acc)
+        sess.flush()
+        party.credit_account_id = acc.id
+        sess.flush()
     svc.audit(sess, user, "party.credit_account", "party", str(party.id),
               f"{acc.code} برای {party.name}", ip)
     return acc
@@ -1349,16 +1403,30 @@ def list_invoices(sess, party_id: int | None = None, trip_id: int | None = None,
 
 
 # ------------------------------------------------------------------ صورتحساب تأمین‌کننده
-def create_bill(sess, user, party_id: int, doc_date: date, net: int, vat: int | None = None,
+def create_bill(sess, user, party_id: int, doc_date: date, net: int | None = None,
+                vat: int | None = None,
                 expense_account_id: int | None = None, trip_id: int | None = None,
                 description: str = "", due_date: date | None = None, issue: bool = False,
                 ip: str = "", bill_type: str = "expense",
-                source_invoice_id: int | None = None) -> SupplierBill:
+                source_invoice_id: int | None = None,
+                currency: str = "IRR", fx_amount_minor: int = 0,
+                fx_rate_rial: int = 0) -> SupplierBill:
     party = _party(sess, party_id, "supplier")
-    if net <= 0:
+    fx_code, fx_amt, fx_rate = _check_fx_inputs(currency, fx_amount_minor, fx_rate_rial)
+    if fx_code != "IRR":
+        # مبنای ریالی دفتر دقیقاً از روی داده‌ی ارزی محاسبه می‌شود؛ اگر حسابدار عدد ریالی هم
+        # داده باشد، باید با همین مقدار یکی باشد تا اختلاف ناخواسته در دفتر نیاید.
+        computed_net = fx_amt * fx_rate // 100
+        if net not in (None, 0) and int(net) != computed_net:
+            raise DomainError(
+                f"مبلغ ریالی صورتحساب با مبلغ ارزی × نرخ هم‌خوانی ندارد؛ باید {computed_net:,} ریال باشد.")
+        net = computed_net
+    if net is None or net <= 0:
         raise DomainError("مبلغ صورتحساب باید بزرگ‌تر از صفر باشد.")
     if bill_type not in ("expense", "consignment"):
         raise DomainError("نوع صورتحساب تأمین‌کننده نامعتبر است.")
+    if bill_type == "consignment" and fx_code != "IRR":
+        raise DomainError("برای بدهی امانی فعلاً تسویه‌ی ارزی فعال نیست؛ صورتحساب را ریالی ثبت کنید.")
     if trip_id and sess.get(Trip, trip_id) is None:
         raise DomainError("پرونده‌ی سفر انتخاب‌شده پیدا نشد.")
     if source_invoice_id and sess.get(Invoice, source_invoice_id) is None:
@@ -1385,6 +1453,7 @@ def create_bill(sess, user, party_id: int, doc_date: date, net: int, vat: int | 
     bill = SupplierBill(doc_date=doc_date, due_date=due_date or doc_date, party_id=party.id,
                         trip_id=trip_id, created_by=user.id, expense_account_id=acc.id,
                         bill_type=bill_type, source_invoice_id=source_invoice_id,
+                        currency_code=fx_code, fx_amount_minor=fx_amt, fx_rate_rial=fx_rate,
                         description=str(description)[:300], net_rial=net, vat_rial=vat,
                         total_rial=net + vat, status="draft")
     sess.add(bill)
@@ -1470,6 +1539,8 @@ def list_bills(sess, party_id: int | None = None, trip_id: int | None = None,
              "trip": trips.get(b.trip_id, "—") if b.trip_id else "—", "trip_id": b.trip_id,
              "description": b.description, "status": b.status,
              "bill_type": b.bill_type, "source_invoice_id": b.source_invoice_id,
+             "currency": b.currency_code, "fx_amount": b.fx_amount_minor,
+             "fx_rate": b.fx_rate_rial,
              "net": b.net_rial, "vat": b.vat_rial, "total": b.total_rial, "paid": b.paid_rial,
              "open": b.total_rial - b.paid_rial,
              "expense_account": accounts[b.expense_account_id].name if b.expense_account_id in accounts else ""}
@@ -1507,10 +1578,23 @@ def _allocate(sess, settlement: Settlement) -> None:
     else:
         if settlement.target_invoice_id:
             raise DomainError("دریافتِ هدفمند به فاکتور فقط برای جهت «دریافت» مجاز است.")
-        rows = sess.execute(select(SupplierBill).where(SupplierBill.party_id == settlement.party_id,
-                                                       SupplierBill.status == "issued",
-                                                       SupplierBill.total_rial > SupplierBill.paid_rial)
-                            .order_by(SupplierBill.due_date, SupplierBill.id)).scalars()
+        if settlement.target_bill_id:
+            if settlement.currency_code != "IRR":
+                raise DomainError("صورتحساب ارزی فقط با تسویه‌ی ارزی بسته می‌شود؛ نرخ ارز روز را بنویسید.")
+            target = sess.get(SupplierBill, settlement.target_bill_id)
+            if target is None or target.status != "issued" or target.party_id != settlement.party_id:
+                raise DomainError("صورتحساب هدف پرداخت صادر نشده یا به این تأمین‌کننده تعلق ندارد.")
+            if target.currency_code != "IRR":
+                raise DomainError("این صورتحساب ارزی است؛ برای تسویه، مبلغ خارجی و نرخ روز پرداخت را بنویسید.")
+            rows = [target]
+        else:
+            # صورتحساب‌های ارزی با پول ریالی «خودکار» بسته نمی‌شوند؛ نرخ روز ناشناخته است
+            # و هر تخصیص ریالی به آن‌ها (راه تسویه‌ی ارزی با صورتحساب هدف مشخص) اشتباه می‌شود.
+            rows = sess.execute(select(SupplierBill).where(SupplierBill.party_id == settlement.party_id,
+                                                           SupplierBill.status == "issued",
+                                                           SupplierBill.currency_code == "IRR",
+                                                           SupplierBill.total_rial > SupplierBill.paid_rial)
+                                .order_by(SupplierBill.due_date, SupplierBill.id)).scalars()
         target_type = "bill"
     for doc in rows:
         if remaining <= 0:
@@ -1523,6 +1607,8 @@ def _allocate(sess, settlement: Settlement) -> None:
             target_type=target_type, target_id=doc.id, amount_rial=amount))
     if settlement.target_invoice_id and remaining:
         raise DomainError("مبلغ دریافت از مانده‌ی فاکتور انتخاب‌شده بیشتر است؛ مازاد خودکار به فاکتور دیگری نمی‌رود.")
+    if settlement.target_bill_id and remaining:
+        raise DomainError("مبلغ پرداخت از مانده‌ی صورتحساب انتخاب‌شده بیشتر است؛ مازاد خودکار به صورتحساب دیگری نمی‌رود.")
 
 
 def create_settlement(sess, user, direction: str, party_id: int, account_id: int, amount: int,
@@ -1533,7 +1619,10 @@ def create_settlement(sess, user, direction: str, party_id: int, account_id: int
                       ref_no: str = "", batch_no: str = "",
                       cheque_account_number: str = "", cheque_sheba: str = "", cheque_sayad_id: str = "",
                       target_invoice_id: int | None = None,
-                      partial_cancel_id: int | None = None) -> Settlement:
+                      partial_cancel_id: int | None = None,
+                      target_bill_id: int | None = None,
+                      currency: str = "IRR", fx_amount_minor: int = 0,
+                      fx_rate_rial: int = 0) -> Settlement:
     if direction not in ("in", "out"):
         raise DomainError("نوع عملیات باید دریافت یا پرداخت باشد.")
     party = _party(sess, party_id, "customer" if direction == "in" else "supplier")
@@ -1577,6 +1666,45 @@ def create_settlement(sess, user, direction: str, party_id: int, account_id: int
             raise DomainError("فاکتور هدف دریافت برای این مشتری معتبر نیست.")
         if target.status == "issued" and amount > target.total_rial - target.paid_rial:
             raise DomainError("دریافت از مانده‌ی فاکتور انتخاب‌شده بیشتر است.")
+    fx_code, fx_amt, fx_rate = _check_fx_inputs(currency, fx_amount_minor, fx_rate_rial)
+    target_bill: SupplierBill | None = None
+    if target_bill_id is not None:
+        if direction != "out":
+            raise DomainError("فقط پرداخت به تأمین‌کننده را می‌توان به صورتحساب تخصیص داد.")
+        target_bill = sess.get(SupplierBill, int(target_bill_id))
+        if target_bill is None or target_bill.party_id != party.id or target_bill.status == "cancelled":
+            raise DomainError("صورتحساب هدف پرداخت برای این تأمین‌کننده معتبر نیست.")
+        if fx_code == "IRR":
+            if target_bill.currency_code != "IRR":
+                raise DomainError("این صورتحساب ارزی است؛ مبلغ خارجی و نرخ روز پرداخت را هم وارد کنید "
+                                  "تا اختلاف نرخ واقع‌شده دقیق ثبت شود.")
+            if target_bill.status == "issued" and amount > target_bill.total_rial - target_bill.paid_rial:
+                raise DomainError("پرداخت از مانده‌ی صورتحساب انتخاب‌شده بیشتر است.")
+    if fx_code != "IRR":
+        # تسویه‌ی ارزی (پرداخت پول واقعی به نرخ روز) — فقط پرداخت فوری به تأمین‌کننده و حتماً
+        # به یک صورتحسابِ ارزیِ صادرشده متصل می‌شود تا نرخ دفتری و مانده‌ی دقیق معلوم باشد.
+        if direction != "out":
+            raise DomainError("تسویه‌ی ارزی فعلاً فقط برای پرداخت به تأمین‌کننده فعال است.")
+        if method not in ("cash", "bank", "card", "transfer"):
+            raise DomainError("تسویه‌ی ارزی با چک یا تخفیف پشتیبانی نمی‌شود؛ با پرداخت نقدی/بانکی انجام دهید.")
+        if target_bill is None:
+            raise DomainError("تسویه‌ی ارزی نیازمند انتخاب صورتحساب هدف است تا نرخ دفتری آن مشخص شود.")
+        if target_bill.status != "issued":
+            raise DomainError("صورتحساب هدف تسویه‌ی ارزی هنوز صادر نشده است.")
+        if target_bill.currency_code == "IRR" or not target_bill.fx_amount_minor \
+                or target_bill.fx_rate_rial <= 0:
+            raise DomainError("صورتحساب هدف داده‌ی ارزی ندارد؛ تسویه‌ی ارزی بدون نرخ دفتری ممکن نیست.")
+        if target_bill.currency_code != fx_code:
+            raise DomainError(f"ارز تسویه ({fx_code}) با ارز صورتحساب ({target_bill.currency_code}) یکی نیست.")
+        expected = (fx_amt * fx_rate) // 100
+        if amount != expected:
+            raise DomainError(f"مبلغ ریالی پرداخت باید برابر مبلغ ارزی × نرخ باشد: {expected:,} ریال.")
+        released_units = fx_amt * target_bill.fx_rate_rial
+        if released_units % 100 != 0:
+            raise DomainError("نرخ دفتری صورتحساب با این مبلغ ارزی به ریال صحیح نمی‌رسد؛ "
+                              "مبلغ ارزی تسویه را دقیق‌تر وارد کنید.")
+        if released_units // 100 > target_bill.total_rial - target_bill.paid_rial:
+            raise DomainError("مبلغ ارزی پرداخت از مانده‌ی صورتحساب هدف بیشتر است.")
     if method == "cheque":
         if not cheque_number or not cheque_due_date:
             raise DomainError("برای روش چک، شماره چک و سررسید را وارد کنید.")
@@ -1603,6 +1731,8 @@ def create_settlement(sess, user, direction: str, party_id: int, account_id: int
     jy = jd.jalali_parts(doc_date)[0]
     s = Settlement(direction=direction, doc_date=doc_date, party_id=party.id, trip_id=trip_id,
                    target_invoice_id=target_invoice_id, partial_cancel_id=partial_cancel_id,
+                   target_bill_id=target_bill_id,
+                   currency_code=fx_code, fx_amount_minor=fx_amt, fx_rate_rial=fx_rate,
                    account_id=acc.id, amount_rial=amount, created_by=user.id,
                    description=str(description)[:300], status="draft", method=method,
                    ref_no=str(ref_no or "")[:60], batch_no=str(batch_no or "")[:40],
@@ -1632,6 +1762,52 @@ def create_settlement(sess, user, direction: str, party_id: int, account_id: int
     return s
 
 
+def _fx_settlement_entry(sess, s: Settlement, party: Party,
+                         acc: Account) -> tuple[list[dict], str, tuple[SupplierBill, int]]:
+    """خطوط سند تسویه‌ی ارزی: بدهی دفتری طرف آزاد می‌شود و اختلاف نرخ واقع‌شده به ۴۱۱۱/۵۱۱۱ می‌رود.
+
+    سند همچنان کاملاً به ریال تراز می‌شود؛ خط اختلاف همان چیزی است که بدهکار/بستانکار را برابر می‌کند
+    (بدهی دفتری + زیان = پول پرداختی، یا بدهی دفتری = پول پرداختی + سود).
+    """
+    bill = sess.get(SupplierBill, s.target_bill_id) if s.target_bill_id else None
+    if bill is None or bill.party_id != party.id:
+        raise DomainError("صورتحساب هدف تسویه‌ی ارزی به این تأمین‌کننده تعلق ندارد.")
+    if bill.status != "issued":
+        raise DomainError("صورتحساب هدف تسویه‌ی ارزی هنوز صادر نشده است.")
+    if bill.currency_code == "IRR" or not bill.fx_amount_minor or bill.fx_rate_rial <= 0:
+        raise DomainError("صورتحساب هدف داده‌ی ارزی ندارد؛ تسویه‌ی ارزی بدون نرخ دفتری ممکن نیست.")
+    if bill.currency_code != s.currency_code:
+        raise DomainError("ارز تسویه با ارز صورتحساب یکی نیست.")
+    released_units = s.fx_amount_minor * bill.fx_rate_rial
+    if released_units % 100 != 0:
+        raise DomainError("نرخ دفتری صورتحساب با این مبلغ ارزی به ریال صحیح نمی‌رسد؛ "
+                          "مبلغ ارزی تسویه را دقیق‌تر وارد کنید.")
+    released = released_units // 100
+    if released <= 0 or released > bill.total_rial - bill.paid_rial:
+        raise DomainError("مبلغ ارزی پرداخت از مانده‌ی صورتحساب هدف بیشتر است.")
+    cur = s.currency_code
+    note = f"{_fx_text(s.fx_amount_minor)} {cur} × نرخ {s.fx_rate_rial:,}"
+    lines = [{"account_id": party.account_id, "debit": released, "credit": 0,
+              "description": f"آزادشدن بدهی دفتری بابت {bill.number} ({note})"}]
+    diff = s.amount_rial - released
+    if diff > 0:
+        loss = svc.account_by_code(sess, SYSTEM_CODES["fx_loss"])
+        if loss is None:
+            raise DomainError("حساب ۵۱۱۱ (زیان نرخ ارز) در کدینگ پیدا نشد؛ تسویه‌ی ارزی قابل صدور نیست.")
+        lines.append({"account_id": loss.id, "debit": diff, "credit": 0,
+                      "description": f"زیان واقع‌شده‌ی نرخ ارز بابت {bill.number}"})
+    elif diff < 0:
+        gain = svc.account_by_code(sess, SYSTEM_CODES["fx_gain"])
+        if gain is None:
+            raise DomainError("حساب ۴۱۱۱ (سود نرخ ارز) در کدینگ پیدا نشد؛ تسویه‌ی ارزی قابل صدور نیست.")
+        lines.append({"account_id": gain.id, "debit": 0, "credit": -diff,
+                      "description": f"سود واقع‌شده‌ی نرخ ارز بابت {bill.number}"})
+    lines.append({"account_id": acc.id, "debit": 0, "credit": s.amount_rial,
+                  "description": f"پرداخت ارزی از {acc.name} ({note})"})
+    title = f"تسویه‌ی ارزی {s.number} به {party.name} — {note}"
+    return lines, title, (bill, released)
+
+
 def issue_settlement(sess, user, settlement_id: int, ip: str = "") -> Settlement:
     s = sess.get(Settlement, settlement_id)
     if s is None:
@@ -1642,7 +1818,10 @@ def issue_settlement(sess, user, settlement_id: int, ip: str = "") -> Settlement
         raise DomainError("این عملیات ابطال شده است.")
     party = sess.get(Party, s.party_id)
     acc = sess.get(Account, s.account_id)
-    if s.method == "discount":
+    fx_release: tuple[SupplierBill, int] | None = None
+    if s.currency_code != "IRR":
+        lines, title, fx_release = _fx_settlement_entry(sess, s, party, acc)
+    elif s.method == "discount":
         # ردیف تخفیف: پول جابه‌جا نمی‌شود؛ فقط بدهی طرف با سند تخفیف صفر می‌شود
         disc_code = "4104" if s.direction == "in" else "4109"
         dacc = svc.account_by_code(sess, disc_code)
@@ -1677,7 +1856,15 @@ def issue_settlement(sess, user, settlement_id: int, ip: str = "") -> Settlement
     svc.post_entry(sess, user, entry.id, ip)
     s.entry_id = entry.id
     s.status = "issued"
-    _allocate(sess, s)
+    if fx_release is not None:
+        # تسویه‌ی ارزی: تخصیص با «بدهی دفتریِ آزادشده» است، نه پول ریالی پرداخت‌شده؛
+        # اختلافش در همان سند به ۴۱۱۱/۵۱۱۱ رفته است.
+        bill, released = fx_release
+        bill.paid_rial += released
+        s.allocations.append(SettlementAllocation(target_type="bill", target_id=bill.id,
+                                                  amount_rial=released))
+    else:
+        _allocate(sess, s)
     sess.flush()
     svc.audit(sess, user, "settlement.issue", "settlement", str(s.id), s.number, ip)
     return s
@@ -1894,6 +2081,8 @@ def list_settlements(sess, direction: str | None = None, party_id: int | None = 
                     "account": accounts[s.account_id].name if s.account_id in accounts else "",
                     "amount": s.amount_rial, "description": s.description, "status": s.status,
                     "trip_id": s.trip_id,
+                    "currency": s.currency_code, "fx_amount": s.fx_amount_minor,
+                    "fx_rate": s.fx_rate_rial, "target_bill_id": s.target_bill_id,
                     "allocated": allocated,
                     "unallocated": s.amount_rial - allocated,
                     "allocations": [{"id": a.id, "target_type": a.target_type, "target_id": a.target_id,

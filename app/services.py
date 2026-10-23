@@ -42,10 +42,21 @@ def period_for(sess, d: date) -> Period:
     return p
 
 
+def _validate_period_key(jy: int, jm: int) -> None:
+    if not 1390 <= int(jy) <= 1450:
+        raise DomainError("سال مالی خارج از محدوده‌ی مجاز است.")
+    if not 1 <= int(jm) <= 12:
+        raise DomainError("شماره‌ی دوره باید بین ۱ تا ۱۲ باشد.")
+
+
 def close_period(sess, user: User, jy: int, jm: int, ip: str = "") -> Period:
+    _validate_period_key(jy, jm)
     p = sess.execute(select(Period).where(Period.jy == jy, Period.jm == jm)).scalar_one_or_none()
     if p is None:
         raise DomainError(f"دوره‌ی {jd.MONTHS[jm - 1]} {jy} ساخته نشده است.")
+    year = sess.get(FiscalYear, p.fiscal_year_id)
+    if year and year.status == "closed":
+        raise DomainError(f"سال مالی {jy} بسته است؛ تغییر دوره فقط از فرایند مجاز بازگشایی سال انجام می‌شود.")
     if p.status == "closed":
         raise DomainError(f"دوره‌ی {jd.MONTHS[jm - 1]} {jy} از قبل بسته شده است.")
     p.status = "closed"
@@ -56,9 +67,15 @@ def close_period(sess, user: User, jy: int, jm: int, ip: str = "") -> Period:
 
 
 def reopen_period(sess, user: User, jy: int, jm: int, ip: str = "") -> Period:
+    _validate_period_key(jy, jm)
     p = sess.execute(select(Period).where(Period.jy == jy, Period.jm == jm)).scalar_one_or_none()
     if p is None:
         raise DomainError("این دوره وجود ندارد.")
+    year = sess.get(FiscalYear, p.fiscal_year_id)
+    if year and year.status == "closed":
+        raise DomainError(f"سال مالی {jy} بسته است؛ برای بازکردن دوره، ابتدا فرایند بازگشایی سال را تکمیل کنید.")
+    if p.status == "open":
+        raise DomainError(f"دوره‌ی {jd.MONTHS[jm - 1]} {jy} از قبل باز است.")
     p.status = "open"
     p.closed_at = None
     p.closed_by = None
@@ -222,6 +239,27 @@ def _validated_lines(sess, raw_lines, require_balanced: bool = True) -> Validati
     return v
 
 
+def _assert_entry_date_open(sess, entry_date: date) -> tuple[FiscalYear, Period]:
+    jy, jm = jd.period_of(entry_date)
+    if not 1390 <= jy <= 1450:
+        raise DomainError("تاریخ سند خارج از محدوده‌ی مجاز است.")
+    year = sess.execute(select(FiscalYear).where(FiscalYear.title == str(jy))).scalar_one_or_none()
+    if year is not None and year.status == "closed":
+        raise DomainError(
+            f"سال مالی {jy} بسته است و ثبت سند در آن مجاز نیست؛ از مسیر مجاز بازگشایی سال اقدام کنید.",
+            "year_closed",
+        )
+    period = period_for(sess, entry_date)
+    if period.status == "closed":
+        raise DomainError(
+            f"دوره‌ی {jd.MONTHS[jm - 1]} {jy} بسته است و ثبت یا تأیید سند در آن مجاز نیست؛ "
+            "تاریخ سند را بررسی کنید یا دوره را طبق فرایند مجاز باز کنید.",
+            "period_closed",
+        )
+    year = sess.get(FiscalYear, period.fiscal_year_id)
+    return year, period
+
+
 def create_draft(sess, user: User, entry_date: date, description: str, raw_lines,
                  source: str = "manual", source_ref: str | None = None,
                  idempotency_key: str | None = None, ip: str = "") -> JournalEntry:
@@ -236,17 +274,7 @@ def create_draft(sess, user: User, entry_date: date, description: str, raw_lines
     if v.problems:
         raise DomainError(v.message(), "invalid_lines")
 
-    if not (1390 <= jd.jalali_parts(entry_date)[0] <= 1450):
-        raise DomainError("تاریخ سند خارج از محدوده‌ی مجاز است.")
-
-    _year = sess.execute(select(FiscalYear).where(FiscalYear.title == str(jd.jalali_parts(entry_date)[0]))
-                         ).scalar_one_or_none()
-    if _year is not None and _year.status == "closed":
-        raise DomainError(
-            f"سال مالی {_year.title} بسته شده است و سند تازه در آن ثبت نمی‌شود. "
-            f"یا تاریخ سند را به سال جاری ببرید، یا حسابدار سال {_year.title} را باز کند.",
-            "year_closed",
-        )
+    _assert_entry_date_open(sess, entry_date)
 
     entry = JournalEntry(
         entry_date=entry_date,
@@ -280,6 +308,8 @@ def update_draft(sess, user: User, entry_id: int, entry_date: date | None = None
     if entry.created_by != user.id and not _can(user, "journal.edit"):
         raise DomainError("این پیش‌نویس را شما نساخته‌اید.", "forbidden")
 
+    effective_date = entry_date or entry.entry_date
+    _assert_entry_date_open(sess, effective_date)
     if raw_lines is not None:
         v = _validated_lines(sess, raw_lines, require_balanced=False)
         if v.problems:
@@ -305,8 +335,12 @@ def _can(user: User, permission: str) -> bool:
     return role_has(user.role, permission)
 
 
-def post_entry(sess, user: User, entry_id: int, ip: str = "") -> JournalEntry:
-    """ثبت نهایی: تنها نقطه‌ای که یک سند وارد دفتر می‌شود."""
+def post_entry(sess, user: User, entry_id: int, ip: str = "", *,
+               allow_fiscal_document: bool = False) -> JournalEntry:
+    """ثبت نهایی: تنها نقطه‌ای که یک سند وارد دفتر می‌شود.
+
+    اختتامیه/افتتاحیه فقط پس از fingerprint و کنترل اختصاصی چرخه از مسیر fiscal ثبت می‌شوند.
+    """
     entry = sess.get(JournalEntry, entry_id)
     if entry is None:
         raise DomainError("این سند پیدا نشد.")
@@ -314,6 +348,8 @@ def post_entry(sess, user: User, entry_id: int, ip: str = "") -> JournalEntry:
         return entry
     if entry.status != "draft":
         raise DomainError("این سند در وضعیت قابل ثبت نیست (از قبل ابطال شده است).")
+    if entry.source in {"opening", "closing"} and not allow_fiscal_document:
+        raise DomainError("سند افتتاحیه/اختتامیه فقط از مسیر تأیید و نهایی‌سازی سال مالی قابل ثبت است.")
 
     raw = [{"account_id": l.account_id, "debit": l.debit_rial, "credit": l.credit_rial,
             "description": l.description} for l in entry.lines]
@@ -321,22 +357,10 @@ def post_entry(sess, user: User, entry_id: int, ip: str = "") -> JournalEntry:
     if v.problems:
         raise DomainError(v.message(), "invalid_lines")
 
-    year = sess.execute(select(FiscalYear).where(FiscalYear.title == str(entry.jy))
-                        ).scalar_one_or_none()
-    if year is not None and year.status == "closed":
-        raise DomainError(
-            f"سال مالی {entry.jy} بسته شده است و سند جدید در آن ثبت نمی‌شود. "
-            f"یا تاریخ سند را به سال جاری ببرید، یا حسابدار سال {entry.jy} را باز کند.",
-            "year_closed",
-        )
-
-    period = period_for(sess, entry.entry_date)
-    if period.status == "closed":
-        raise DomainError(
-            f"دوره‌ی {jd.MONTHS[period.jm - 1]} {period.jy} بسته شده است و سند جدید "
-            f"در آن ثبت نمی‌شود. تاریخ سند را عوض کنید یا حسابدار مسئول دوره را باز کند.",
-            "period_closed",
-        )
+    actual_jy, actual_jm = jd.period_of(entry.entry_date)
+    if (entry.jy, entry.jm) != (actual_jy, actual_jm):
+        raise DomainError("سال و دوره‌ی ذخیره‌شده با تاریخ سند یکسان نیست؛ پیش از ثبت، داده را اصلاح کنید.")
+    _assert_entry_date_open(sess, entry.entry_date)
 
     last_no = sess.execute(
         select(func.max(JournalEntry.entry_no)).where(JournalEntry.entry_no.is_not(None),
@@ -353,13 +377,19 @@ def post_entry(sess, user: User, entry_id: int, ip: str = "") -> JournalEntry:
     return entry
 
 
-def reverse_entry(sess, user: User, entry_id: int, reason: str, ip: str = "") -> JournalEntry:
+def reverse_entry(sess, user: User, entry_id: int, reason: str, ip: str = "", *,
+                  allow_fiscal_document: bool = False) -> JournalEntry:
     """ابطال سند: سند اصلی پاک نمی‌شود؛ یک سند معکوس ثبت می‌شود تا ردّ کار بماند."""
     entry = sess.get(JournalEntry, entry_id)
     if entry is None:
         raise DomainError("این سند پیدا نشد.")
     if entry.status != "posted":
         raise DomainError("فقط سند ثبت‌شده قابل ابطال است.")
+    protected_fiscal_entry = (entry.source == "closing" or
+                              (entry.source == "opening" and not
+                               (entry.source_ref or "").startswith("external->")))
+    if protected_fiscal_entry and not allow_fiscal_document:
+        raise DomainError("سند اختتامیه و افتتاحیه‌ی انتقالی فقط از گردش کنترل‌شده‌ی سال مالی قابل ابطال است.")
     if entry.reversed_by_id:
         raise DomainError("این سند قبلاً ابطال شده است.")
     reason = str(reason or "").strip()
@@ -426,7 +456,22 @@ def get_entry(sess, entry_id: int) -> JournalEntry:
 BOOKED_STATUSES = ("posted", "reversed")
 
 
-def posted_lines_query(frm: date | None = None, to: date | None = None):
+def _opening_boundary(sess, to: date | None) -> date | None:
+    """آخرین افتتاحیه‌ی فعال تا تاریخ گزارش؛ مانده‌ی آن جایگزین سابقه‌ی قدیمی‌تر است."""
+    q = select(JournalEntry.entry_date).where(
+        JournalEntry.source == "opening", JournalEntry.status == "posted")
+    if to is not None:
+        q = q.where(JournalEntry.entry_date <= to)
+    return sess.execute(q.order_by(JournalEntry.entry_date.desc(), JournalEntry.id.desc())
+                        .limit(1)).scalar_one_or_none()
+
+
+def posted_lines_query(sess, frm: date | None = None, to: date | None = None):
+    # دفتر تاریخی نگه داشته می‌شود؛ اما افتتاحیه‌ی ثبت‌شده، مبنای مانده‌ی جاری است و نباید
+    # با مانده‌ی پایان سال مبدأ جمع شود. گزارش‌های بازه‌ای قدیمی‌تر از افتتاحیه دست‌نخورده‌اند.
+    boundary = _opening_boundary(sess, to)
+    if boundary is not None and (frm is None or frm < boundary):
+        frm = boundary
     q = (select(JournalLine.account_id,
                 func.sum(JournalLine.debit_rial).label("debit"),
                 func.sum(JournalLine.credit_rial).label("credit"))
@@ -441,7 +486,7 @@ def posted_lines_query(frm: date | None = None, to: date | None = None):
 
 def account_balances(sess, frm: date | None = None, to: date | None = None) -> dict[int, dict]:
     out: dict[int, dict] = {}
-    for row in sess.execute(posted_lines_query(frm, to)).all():
+    for row in sess.execute(posted_lines_query(sess, frm, to)).all():
         out[row.account_id] = {"debit": int(row.debit or 0), "credit": int(row.credit or 0)}
     return out
 
@@ -477,7 +522,7 @@ def trial_balance(sess, frm: date, to: date) -> dict:
 def _balances_upto(sess, to: date | None) -> dict[int, int]:
     """مانده هر حساب تا تاریخ to (شامل افتتاحیه). net = debit - credit"""
     out: dict[int, int] = {}
-    q = posted_lines_query(None, to)
+    q = posted_lines_query(sess, None, to)
     for row in sess.execute(q).all():
         out[row.account_id] = int(row.debit or 0) - int(row.credit or 0)
     return out
@@ -486,7 +531,7 @@ def _balances_upto(sess, to: date | None) -> dict[int, int]:
 def _turnover(sess, frm: date, to: date) -> dict[int, dict]:
     """گردش هر حساب فقط بین frm تا to: {'debit': x, 'credit': y}"""
     out: dict[int, dict] = {}
-    q = posted_lines_query(frm, to)
+    q = posted_lines_query(sess, frm, to)
     for row in sess.execute(q).all():
         out[row.account_id] = {"debit": int(row.debit or 0), "credit": int(row.credit or 0)}
     return out
@@ -517,7 +562,10 @@ def trial_balance_4(sess, frm: date, to: date) -> dict:
             "turn_debit": td, "turn_credit": tc,
             "close_debit": cd, "close_credit": cc,
         })
-        t_deb += td; t_cre += tc; c_deb += cd; c_cre += cc
+        t_deb += td
+        t_cre += tc
+        c_deb += cd
+        c_cre += cc
     rows.sort(key=lambda r: r["code"])
     return {"from": jd.jalali_str(frm), "to": jd.jalali_str(to), "rows": rows,
             "total_turn_debit": t_deb, "total_turn_credit": t_cre,
@@ -525,13 +573,25 @@ def trial_balance_4(sess, frm: date, to: date) -> dict:
             "balanced": t_deb == t_cre and c_deb == c_cre, "cols": 4}
 
 
+def _opening_balance_for_period(sess, frm: date) -> dict[int, int]:
+    """مانده‌ی ابتدای بازه؛ اگر بازه از روز ثبت افتتاحیه شروع شود، مانده‌ی قبلی صفر است."""
+    day_before = date.fromordinal(frm.toordinal() - 1)
+    jy = jd.jalali_parts(frm)[0]
+    year = sess.execute(select(FiscalYear).where(FiscalYear.title == str(jy))).scalar_one_or_none()
+    if year and frm == year.start_date:
+        opening = sess.execute(select(JournalEntry.id).where(
+            JournalEntry.source == "opening", JournalEntry.jy == jy,
+            JournalEntry.entry_date == year.start_date, JournalEntry.status == "posted")
+        ).first()
+        if opening:
+            return {}
+    return _balances_upto(sess, day_before)
+
+
 def trial_balance_6(sess, frm: date, to: date) -> dict:
     """۶ ستونی: مانده اول + گردش + مانده آخر (هر کدام بدهکار/بستانکار)"""
-    from datetime import timedelta
     accounts = account_map(sess)
-    # مانده اول = تا روز قبل frm
-    day_before = date.fromordinal(frm.toordinal() - 1)
-    opening_net = _balances_upto(sess, day_before)
+    opening_net = _opening_balance_for_period(sess, frm)
     turnover = _turnover(sess, frm, to)
     closing_net = _balances_upto(sess, to)
     all_ids = set(opening_net.keys()) | set(turnover.keys()) | set(closing_net.keys())
@@ -545,8 +605,10 @@ def trial_balance_6(sess, frm: date, to: date) -> dict:
         td = turnover.get(acc_id, {"debit": 0, "credit": 0})["debit"]
         tc = turnover.get(acc_id, {"debit": 0, "credit": 0})["credit"]
         cl = closing_net.get(acc_id, 0)
-        od = op if op > 0 else 0; oc = -op if op < 0 else 0
-        cd = cl if cl > 0 else 0; cc = -cl if cl < 0 else 0
+        od = op if op > 0 else 0
+        oc = -op if op < 0 else 0
+        cd = cl if cl > 0 else 0
+        cc = -cl if cl < 0 else 0
         if od==0 and oc==0 and td==0 and tc==0 and cd==0 and cc==0:
             continue
         rows.append({
@@ -555,7 +617,12 @@ def trial_balance_6(sess, frm: date, to: date) -> dict:
             "turn_debit": td, "turn_credit": tc,
             "close_debit": cd, "close_credit": cc,
         })
-        o_deb+=od; o_cre+=oc; t_deb+=td; t_cre+=tc; c_deb+=cd; c_cre+=cc
+        o_deb += od
+        o_cre += oc
+        t_deb += td
+        t_cre += tc
+        c_deb += cd
+        c_cre += cc
     rows.sort(key=lambda r: r["code"])
     return {"from": jd.jalali_str(frm), "to": jd.jalali_str(to), "rows": rows,
             "total_open_debit": o_deb, "total_open_credit": o_cre,
@@ -570,9 +637,7 @@ def gerdash_account(sess, account_id: int, frm: date, to: date) -> dict:
     acc = sess.get(Account, account_id)
     if acc is None:
         raise DomainError("این حساب پیدا نشد.")
-    # مانده اول
-    opening_net = _balances_upto(sess, date.fromordinal(frm.toordinal() - 1)).get(account_id, 0)
-    # گردش‌ها
+    # گردش‌ها؛ مانده‌ی ابتدای بازه در ledger محاسبه می‌شود.
     turn = _turnover(sess, frm, to).get(account_id, {"debit": 0, "credit": 0})
     # ریز گردش — همان ledger
     ld = ledger(sess, account_id, frm, to)
@@ -594,7 +659,7 @@ def gerdash_summary(sess, frm: date, to: date, search: str | None = None) -> dic
     if search:
         s = search.strip().lower()
         accounts = [a for a in accounts if s in (a.code or "").lower() or s in (a.name or "").lower()]
-    opening_map = _balances_upto(sess, date.fromordinal(frm.toordinal() - 1))
+    opening_map = _opening_balance_for_period(sess, frm)
     turn_map = _turnover(sess, frm, to)
     # تاریخ آخرین عملیات هر حساب
     last_map: dict[int, date | None] = {}
@@ -643,7 +708,8 @@ def gerdash_group(sess, report_group: str, frm: date, to: date) -> dict:
         net = turn["debit"] - turn["credit"]
         rows.append({"account_id": acc.id, "code": acc.code, "name": acc.name,
                      "debit": turn["debit"], "credit": turn["credit"], "net": net})
-        total_debit += turn["debit"]; total_credit += turn["credit"]
+        total_debit += turn["debit"]
+        total_credit += turn["credit"]
     return {"from": jd.jalali_str(frm), "to": jd.jalali_str(to), "group": report_group,
             "rows": rows, "total_debit": total_debit, "total_credit": total_credit}
 
@@ -652,8 +718,8 @@ def ledger(sess, account_id: int, frm: date, to: date) -> dict:
     acc = sess.get(Account, account_id)
     if acc is None:
         raise DomainError("این حساب پیدا نشد.")
-    opening = account_balances(sess, None, date.fromordinal(frm.toordinal() - 1)).get(
-        account_id, {"debit": 0, "credit": 0})
+    opening_net = _opening_balance_for_period(sess, frm).get(account_id, 0)
+    opening = {"debit": max(opening_net, 0), "credit": max(-opening_net, 0)}
     running = opening["debit"] - opening["credit"]
     rows = sess.execute(
         select(JournalEntry.entry_date, JournalEntry.entry_no, JournalEntry.description,

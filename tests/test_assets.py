@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+from app import dates as jd
 from conftest import account_id
 
 
@@ -23,6 +24,14 @@ def _codes(entry: dict) -> dict:
 
 COST = 120_000_000          # بهای خرید: ۱۲۰ میلیون ریال
 EXPECTED_M1 = 3_300_000     # ۳۳٪ سالانه روی مانده، ماه اول ≈ ۳٬۳۰۰٬۰۰۰ ریال
+
+
+def _period_after(offset: int = 0) -> tuple[int, int]:
+    """یک دوره‌ی آینده نسبت به ماه‌های استهلاک seed؛ مانع برخورد آزمون با نمونه‌های پویا می‌شود."""
+    jy, jm, _ = jd.jalali_parts(jd.jtoday())
+    index = jy * 12 + (jm - 1) + offset
+    year, month0 = divmod(index, 12)
+    return year, month0 + 1
 
 
 def _categories(client, headers) -> dict:
@@ -64,9 +73,11 @@ def test_asset_purchase_posts_entry(client, accountant):
 
 def test_depreciation_monthly(client, accountant):
     """استهلاک ماهانه: حساب می‌شود، ثبت می‌شود و ارزش دفتری پایین می‌آید."""
+    jy, jm = _period_after(0)
+    period_date = f"{jy}/{jm:02d}/01"
     asset = _new_asset(client, accountant, "دارایی استهلاک آزمون", cost=COST,
-                       purchase="1405/07/01", in_service="1405/07/01")
-    r = client.post("/api/depreciation/runs", headers=accountant, json={"jy": 1405, "jm": 7})
+                       purchase=period_date, in_service=period_date)
+    r = client.post("/api/depreciation/runs", headers=accountant, json={"jy": jy, "jm": jm})
     assert r.status_code == 200, r.text
     run = r.json()
     mine = [x for x in run["rows"] if x["asset_id"] == asset["id"]]
@@ -93,7 +104,9 @@ def test_depreciation_monthly(client, accountant):
     assert detail["book_value"] == COST - EXPECTED_M1
 
     # ماه بعد: روی مانده‌ی باقی‌مانده حساب می‌شود (نزولی)، نه دوباره روی کل بها
-    r2 = client.post("/api/depreciation/runs", headers=accountant, json={"jy": 1405, "jm": 8})
+    next_year, next_month = _period_after(1)
+    r2 = client.post("/api/depreciation/runs", headers=accountant,
+                     json={"jy": next_year, "jm": next_month})
     assert r2.status_code == 200, r2.text
     amount2 = next(x["amount"] for x in r2.json()["rows"] if x["asset_id"] == asset["id"])
     assert amount2 < EXPECTED_M1, "روش نزولی: ماه بعد باید کمتر باشد"
@@ -102,14 +115,15 @@ def test_depreciation_monthly(client, accountant):
 
 def test_depreciation_duplicate_month_rejected(client, accountant):
     """یک ماه دوبار سند استهلاک نمی‌خورد؛ تا ثبت نشده می‌شود از نو حسابش کرد، بعد از ثبت نه."""
-    first = client.post("/api/depreciation/runs", headers=accountant, json={"jy": 1405, "jm": 9})
+    jy, jm = _period_after(2)
+    first = client.post("/api/depreciation/runs", headers=accountant, json={"jy": jy, "jm": jm})
     assert first.status_code == 200, first.text
     # پیش از ثبت: دوباره حساب کردن مجاز است (اصلاح محاسبه)
-    recalc = client.post("/api/depreciation/runs", headers=accountant, json={"jy": 1405, "jm": 9})
+    recalc = client.post("/api/depreciation/runs", headers=accountant, json={"jy": jy, "jm": jm})
     assert recalc.status_code == 200, recalc.text
     assert client.post(f"/api/depreciation/runs/{first.json()['id']}/post",
                        headers=accountant).status_code == 200
-    again = client.post("/api/depreciation/runs", headers=accountant, json={"jy": 1405, "jm": 9})
+    again = client.post("/api/depreciation/runs", headers=accountant, json={"jy": jy, "jm": jm})
     assert again.status_code >= 400, "بعد از ثبت سند، استهلاک همان ماه دوباره حساب نمی‌شود"
 
 
@@ -117,8 +131,9 @@ def test_depreciation_cancel_rolls_back(client, accountant):
     """ابطال سند استهلاک، استهلاک انباشته را برمی‌گرداند."""
     asset = _new_asset(client, accountant, "دارایی ابطال آزمون", cost=60_000_000,
                        purchase="1405/05/01", in_service="1405/05/01")
+    jy, jm = _period_after(3)
     run = client.post("/api/depreciation/runs", headers=accountant,
-                      json={"jy": 1405, "jm": 10}).json()
+                      json={"jy": jy, "jm": jm}).json()
     client.post(f"/api/depreciation/runs/{run['id']}/post", headers=accountant)
     acc = client.get(f"/api/assets/{asset['id']}", headers=accountant).json()["asset"]
     assert acc["accumulated"] > 0
@@ -144,7 +159,8 @@ def test_asset_disposal_gain_and_loss(client, accountant):
     # الف) فروش گران‌تر از ارزش دفتری ⇒ سود. اول یک ماه استهلاک می‌گیریم تا استهلاک انباشته هم داشته باشد.
     asset = _new_asset(client, accountant, "دارایی فروش سود", cost=100_000_000,
                        purchase="1405/01/01", in_service="1405/01/01", counter=cash)
-    _depreciate(client, accountant, 1405, 11)      # ماهی که آزمون‌های دیگر با آن کار ندارند
+    depreciation_year, depreciation_month = _period_after(4)
+    _depreciate(client, accountant, depreciation_year, depreciation_month)
     before = client.get(f"/api/assets/{asset['id']}", headers=accountant).json()["asset"]
     assert before["accumulated"] > 0
     book = before["book_value"]
@@ -167,7 +183,8 @@ def test_asset_disposal_gain_and_loss(client, accountant):
     # ب) فروش ارزان‌تر ⇒ زیان
     cheap = _new_asset(client, accountant, "دارایی فروش زیان", cost=40_000_000,
                        purchase="1405/01/01", in_service="1405/01/01", counter=cash)
-    _depreciate(client, accountant, 1405, 12)
+    loss_year, loss_month = _period_after(5)
+    _depreciate(client, accountant, loss_year, loss_month)
     book2 = client.get(f"/api/assets/{cheap['id']}", headers=accountant).json()["asset"]["book_value"]
     price2 = book2 - 5_000_000
     assert client.post(f"/api/assets/{cheap['id']}/dispose", headers=accountant,
@@ -188,8 +205,9 @@ def test_disposed_asset_stops_depreciating(client, accountant):
     client.post(f"/api/assets/{asset['id']}/dispose", headers=accountant,
                 json={"date": "1405/07/20", "amount": 0, "account_id": None,
                       "reason": "از رده خارج شد"})
+    future_year, future_month = _period_after(6)
     run = client.post("/api/depreciation/runs", headers=accountant,
-                      json={"jy": 1406, "jm": 1})       # ماه آزاد: نه در داده‌ی نمونه است نه در آزمون‌های دیگر
+                      json={"jy": future_year, "jm": future_month})
     assert run.status_code == 200, run.text
     assert all(x["asset_id"] != asset["id"] for x in run.json()["rows"])
 

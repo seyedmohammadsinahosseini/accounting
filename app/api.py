@@ -22,7 +22,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 from sqlalchemy import delete, func, select
 
 from . import backup, config, dates as jd, models, services as svc
@@ -226,7 +226,22 @@ async def _logging_and_limits(request: Request, call_next):
 
 
 @app.exception_handler(DomainError)
-async def _domain_error(_req: Request, exc: DomainError):
+async def _domain_error(request: Request, exc: DomainError):
+    if request.url.path.startswith("/api/fiscal/") and request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
+        auth = request.headers.get("Authorization", "")
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        try:
+            with session_scope() as sess:
+                session_row = sess.execute(select(Session).where(
+                    Session.token_hash == token_fingerprint(token), Session.closed_at.is_(None)
+                )).scalar_one_or_none() if token else None
+                user = sess.get(User, session_row.user_id) if session_row else None
+                if user:
+                    svc.audit(sess, user, "fiscal.operation_failed", "api", request.url.path,
+                              f"method={request.method}; code={exc.code}", _client_ip(request))
+        except Exception as audit_exc:  # noqa: BLE001 — لا نغطي خطأ المجال إذا فشل تسجيله
+            app_log.warning("ثبت رویداد شکست عملیات مالی ناموفق بود", exc_info=audit_exc,
+                            extra={"event": "fiscal_failure_audit_failed"})
     return JSONResponse({"detail": exc.message, "code": exc.code}, status_code=400)
 
 
@@ -284,6 +299,32 @@ def require_any(*permissions: str):
 
 def _client_ip(request: Request) -> str:
     return (request.client.host if request.client else "") or ""
+
+
+def fiscal_permission(permission: str):
+    """مجوز اختصاصی عملیات مالی؛ تلاش غیرمجاز هم به Audit Trail اضافه می‌شود."""
+    def dep(request: Request, user: User = Depends(current_user)) -> User:
+        if not role_has(user.role, permission):
+            with session_scope() as sess:
+                svc.audit(sess, user, "fiscal.operation_denied", "api", request.url.path,
+                          f"درخواست غیرمجاز؛ مجوز لازم: {permission}", _client_ip(request))
+            raise HTTPException(403, "برای این کار دسترسی ندارید.")
+        return user
+
+    dep.__required_permissions__ = (permission,)
+    dep.__name__ = f"fiscal_permission_{permission.replace('.', '_')}"
+    return dep
+
+
+def _audit_fiscal_failure(user: User, action: str, entity_id: str,
+                          request: Request, error: DomainError) -> None:
+    try:
+        with session_scope() as sess:
+            svc.audit(sess, user, action, "fiscal_year", entity_id,
+                      f"شکست عملیات؛ کد {error.code}", _client_ip(request))
+    except Exception as exc:  # noqa: BLE001 — حسابرسی شکست نباید پیام خطای اصلی را بپوشاند
+        app_log.warning("ثبت رویداد شکست عملیات مالی ناموفق بود", exc_info=exc,
+                        extra={"event": "fiscal_failure_audit_failed"})
 
 
 class LoginIn(BaseModel):
@@ -768,7 +809,7 @@ def gerdash_group(report_group: str, user: User = Depends(require("reports.view"
 @app.get("/api/reports/treasury")
 def treasury(user: User = Depends(require("cash.view"))):
     with session_scope() as sess:
-        data = svc.cash_and_bank(sess)
+        data = svc.cash_and_bank(sess, jd.jtoday())
         for r in data["rows"]:
             r["balance_fa"] = format_amount_fa(r["balance"])
         data["total_fa"] = format_amount_fa(data["total"])
@@ -804,11 +845,14 @@ def transfer(body: TransferIn, request: Request, user: User = Depends(require("c
 
 # ------------------------------------------------------------------ دوره‌ها
 @app.get("/api/periods")
-def periods(user: User = Depends(require("fiscal.view"))):
+def periods(user: User = Depends(fiscal_permission("fiscal.view"))):
     with session_scope() as sess:
         rows = svc.list_periods(sess)
         return {"rows": [{"jy": p.jy, "jm": p.jm, "title": f"{jd.MONTHS[p.jm - 1]} {p.jy}",
-                          "status": p.status} for p in rows]}
+                          "status": p.status,
+                          "year_status": (sess.get(models.FiscalYear, p.fiscal_year_id).status
+                                          if sess.get(models.FiscalYear, p.fiscal_year_id) else "missing")}
+                         for p in rows]}
 
 
 class PeriodIn(BaseModel):
@@ -817,14 +861,14 @@ class PeriodIn(BaseModel):
 
 
 @app.post("/api/periods/close")
-def period_close(body: PeriodIn, request: Request, user: User = Depends(require("fiscal.manage"))):
+def period_close(body: PeriodIn, request: Request, user: User = Depends(fiscal_permission("fiscal.manage"))):
     with session_scope() as sess:
         p = svc.close_period(sess, user, body.jy, body.jm, _client_ip(request))
         return {"jy": p.jy, "jm": p.jm, "status": p.status}
 
 
 @app.post("/api/periods/reopen")
-def period_reopen(body: PeriodIn, request: Request, user: User = Depends(require("fiscal.manage"))):
+def period_reopen(body: PeriodIn, request: Request, user: User = Depends(fiscal_permission("fiscal.manage"))):
     with session_scope() as sess:
         p = svc.reopen_period(sess, user, body.jy, body.jm, _client_ip(request))
         return {"jy": p.jy, "jm": p.jm, "status": p.status}
@@ -991,7 +1035,7 @@ def export_trial(request: Request, user: User = Depends(require("reports.view"))
                 "trial", ["کد", "نام حساب", "گردش بدهکار", "گردش بستانکار", "مانده بدهکار", "مانده بستانکار"], rows, generated_by=user.username,
                 money_columns={3,4,5,6}, widths=[14,42,20,20,20,20],
                 extra=[("دوره", f"{tb['from']} تا {tb['to']}"), ("نوع تراز","۴ ستونی (گردش + مانده)"), ("تراز","بله" if tb["balanced"] else "خیر")])
-            return _xlsx(data, _jalali_name(f"تراز-۴ستونی"), request, user)
+            return _xlsx(data, _jalali_name("تراز-۴ستونی"), request, user)
         if cols == 6:
             tb = svc.trial_balance_6(sess, f, t)
             rows = [[r["code"], r["name"], r["open_debit"] or "", r["open_credit"] or "", r["turn_debit"] or "", r["turn_credit"] or "", r["close_debit"] or "", r["close_credit"] or ""] for r in tb["rows"]]
@@ -1000,7 +1044,7 @@ def export_trial(request: Request, user: User = Depends(require("reports.view"))
                 "trial", ["کد","نام حساب","مانده اول بدهکار","مانده اول بستانکار","گردش بدهکار","گردش بستانکار","مانده آخر بدهکار","مانده آخر بستانکار"], rows, generated_by=user.username,
                 money_columns={3,4,5,6,7,8}, widths=[12,36,18,18,18,18,18,18],
                 extra=[("دوره", f"{tb['from']} تا {tb['to']}"), ("نوع تراز","۶ ستونی (اول + گردش + آخر)"), ("تراز","بله" if tb["balanced"] else "خیر")])
-            return _xlsx(data, _jalali_name(f"تراز-۶ستونی"), request, user)
+            return _xlsx(data, _jalali_name("تراز-۶ستونی"), request, user)
         tb = svc.trial_balance(sess, f, t)
         rows = [[r["code"], r["name"], r["debit"] or "", r["credit"] or ""] for r in tb["rows"]]
         rows.append(["", "جمع", tb["total_debit"], tb["total_credit"]])
@@ -1818,7 +1862,7 @@ def invoice_profit_summary(invoice_id: int,
     documented=false داده می‌شود). اثر هر لغو = جریمه مشتری + کارمزد + طلب تأمین − مبلغ لغو
     (همان فرمول اسناد؛ جریمه‌ای که تأمین «از آژانس می‌گیرد» نیز در قالب «هزینه‌ی سوخته» داخل
     هزینه‌ی باقی‌مانده می‌ماند و خودکار بر سود اثر می‌گذارد)."""
-    from .models import InvoicePartialCancel, InvoiceLine
+    from .models import InvoicePartialCancel
     with session_scope() as sess:
         inv = sess.get(models.Invoice, invoice_id)
         if inv is None:
@@ -1857,11 +1901,15 @@ class BillIn(BaseModel):
     date: str
     due_date: str | None = None
     trip_id: int | None = None
-    net: str | int
+    net: str | int | None = None     # برای صورتحساب ارزی از روی مبلغ × نرخ محاسبه می‌شود
     vat: str | int | None = None
     expense_account_id: int | None = None
     description: str = ""
     issue: bool = False
+    # داده‌ی ارزی اختیاری (اختیاری — پیش‌فرض کاملاً ریالی)
+    currency: str = "IRR"
+    fx_amount_minor: int = 0         # مبلغ به واحد خرد ارز (مثل سنت)
+    fx_rate_rial: int = 0            # نرخ دفتری: ریال به ازای یک واحد اصلی ارز
 
 
 def _bill_json(sess, bill) -> dict:
@@ -1887,11 +1935,14 @@ def bills(user: User = Depends(require_any("journal.view", "reports.view", "jour
 def bill_create(body: BillIn, request: Request, user: User = Depends(require("journal.create"))):
     with session_scope() as sess:
         vat = None if body.vat is None or str(body.vat).strip() == "" else parse_amount(body.vat)
+        net = None if body.net is None or str(body.net).strip() == "" else parse_amount(body.net)
         bill = sales.create_bill(
-            sess, user, body.party_id, jd.parse_date_any(body.date), parse_amount(body.net),
+            sess, user, body.party_id, jd.parse_date_any(body.date), net,
             vat, body.expense_account_id, body.trip_id, body.description,
             jd.parse_date_any(body.due_date) if body.due_date else None, body.issue,
-            _client_ip(request))
+            _client_ip(request),
+            currency=body.currency, fx_amount_minor=body.fx_amount_minor,
+            fx_rate_rial=body.fx_rate_rial)
         return _bill_json(sess, bill)
 
 
@@ -1917,10 +1968,15 @@ class SettlementIn(BaseModel):
     date: str
     trip_id: int | None = None
     target_invoice_id: int | None = None
+    target_bill_id: int | None = None  # اتصال مستقیم پرداخت به یک صورتحساب (برای تسویه‌ی ارزی ضروری)
     description: str = ""
     issue: bool = True
     method: str = "cash"  # cash|bank|transfer|card|cheque|credit
     ref_no: str = ""      # شماره پیگیری حواله/کارتخوان
+    # داده‌ی ارزی اختیاری تسویه (اختیاری — پیش‌فرض کاملاً ریالی)
+    currency: str = "IRR"
+    fx_amount_minor: int = 0           # مبلغ ارزی پرداختی به واحد خرد ارز
+    fx_rate_rial: int = 0              # نرخ روز پرداخت: ریال به ازای یک واحد اصلی ارز
     cheque_number: str = ""
     cheque_bank: str = ""
     cheque_branch: str = ""
@@ -1984,7 +2040,10 @@ def settlement_create(body: SettlementIn, request: Request,
                                     parse_amount(body.amount), jd.parse_date_any(body.date),
                                     body.trip_id, body.description, body.issue, _client_ip(request),
                                     body.method, body.cheque_number, body.cheque_bank, body.cheque_branch, due,
-                                    target_invoice_id=body.target_invoice_id, ref_no=body.ref_no)
+                                    target_invoice_id=body.target_invoice_id, ref_no=body.ref_no,
+                                    target_bill_id=body.target_bill_id,
+                                    currency=body.currency, fx_amount_minor=body.fx_amount_minor,
+                                    fx_rate_rial=body.fx_rate_rial)
         return _settlement_json(sess, s)
 
 
@@ -2792,7 +2851,7 @@ def report_cash_flow(user: User = Depends(require("reports.view")),
 
 
 @app.get("/api/fiscal/years")
-def fiscal_years(user: User = Depends(require("fiscal.view"))):
+def fiscal_years(user: User = Depends(fiscal_permission("fiscal.view"))):
     with session_scope() as sess:
         rows = statements.fiscal_years(sess)
         for r in rows:
@@ -2800,27 +2859,195 @@ def fiscal_years(user: User = Depends(require("fiscal.view"))):
         return {"rows": rows, "current": jd.fiscal_year_of(jd.jtoday())[0]}
 
 
+class FiscalYearCreateIn(BaseModel):
+    jy: int
+
+
+@app.post("/api/fiscal/years")
+def fiscal_year_create(body: FiscalYearCreateIn, request: Request,
+                       user: User = Depends(fiscal_permission("fiscal.manage"))):
+    with session_scope() as sess:
+        year = statements.create_fiscal_year(sess, user, body.jy, _client_ip(request))
+        return {"title": year.title, "jy": int(year.title),
+                "start": jd.jalali_str(year.start_date), "end": jd.jalali_str(year.end_date),
+                "status": year.status, "opening_status": "missing",
+                "periods": [{"jm": month, "status": "open"} for month in range(1, 13)],
+                "message": f"سال مالی {year.title} و ۱۲ دوره ایجاد شد؛ سند افتتاحیه ایجاد یا ثبت نشد."}
+
+
 class CloseYearIn(BaseModel):
     jy: int
     note: str = ""
+    fingerprint: str = ""
+    draft_entry_id: int | None = None
+
+
+class FiscalPreviewIn(BaseModel):
+    jy: int
+
+
+class OpeningLineIn(BaseModel):
+    account_id: int
+    debit: StrictInt = Field(default=0, ge=0)
+    credit: StrictInt = Field(default=0, ge=0)
+    description: str = ""
+
+
+class OpeningIn(BaseModel):
+    destination_jy: int
+    source_jy: int | None = None
+    mode: str = "transfer"
+    fingerprint: str = ""
+    lines: list[OpeningLineIn] = Field(default_factory=list)
+    draft_entry_id: int | None = None
+
+
+def _fiscal_preview_json(data: dict) -> dict:
+    totals = data.get("totals", {})
+    for key, value in list(totals.items()):
+        if isinstance(value, int):
+            totals[key + "_fa"] = format_amount_fa(value)
+    for row in data.get("rows", []):
+        for key in ("balance", "debit", "credit", "source_net", "opening_net",
+                    "difference_debit", "difference_credit", "difference"):
+            if isinstance(row.get(key), int):
+                row[key + "_fa"] = format_amount_fa(row[key])
+    return data
+
+
+@app.post("/api/fiscal/close-year/precheck")
+def fiscal_close_precheck(body: FiscalPreviewIn, request: Request,
+                          user: User = Depends(fiscal_permission("fiscal.manage"))):
+    with session_scope() as sess:
+        result = statements.closing_precheck(sess, body.jy)
+        svc.audit(sess, user, "fiscal.close_precheck", "fiscal_year", str(body.jy),
+                  f"آمادگی: {result['ready']}؛ خطا: {len(result['errors'])}؛ هشدار: {len(result['warnings'])}",
+                  _client_ip(request))
+        return _fiscal_preview_json(result)
+
+
+@app.post("/api/fiscal/close-year/draft")
+def fiscal_close_draft(body: CloseYearIn, request: Request,
+                       user: User = Depends(fiscal_permission("fiscal.manage"))):
+    with session_scope() as sess:
+        entry = statements.create_closing_draft(sess, user, body.jy, body.fingerprint, _client_ip(request))
+        preview = statements.closing_precheck(sess, body.jy)
+        return {"jy": body.jy, "entry": _entry_json(sess, entry) if entry else None,
+                "preview": _fiscal_preview_json(preview),
+                "message": "پیش‌نویس اختتامیه آماده‌ی بازبینی است." if entry
+                           else "سال مانده‌ی موقت ندارد؛ می‌توانید ثبت نهایی بستن سال را تأیید کنید."}
 
 
 @app.post("/api/fiscal/close-year")
 def fiscal_close_year(body: CloseYearIn, request: Request,
-                      user: User = Depends(require("fiscal.manage"))):
+                      user: User = Depends(fiscal_permission("fiscal.manage"))):
     with session_scope() as sess:
-        closing = statements.close_year(sess, user, body.jy, body.note, _client_ip(request))
-        return {"jy": closing.jy, "profit": closing.profit_rial, "profit_fa": format_amount_fa(closing.profit_rial),
-                "message": f"سال {closing.jy} بسته شد و سود (زیان) به سود و زیان انباشته منتقل شد."}
+        closing = statements.finalize_close_year(sess, user, body.jy, body.fingerprint,
+                                                  body.draft_entry_id, body.note, _client_ip(request))
+        return {"jy": closing.jy, "profit": closing.profit_rial,
+                "profit_fa": format_amount_fa(closing.profit_rial),
+                "entry_id": closing.entry_id,
+                "message": f"سال {closing.jy} پس از بازبینی بسته شد؛ سود/زیان به سود و زیان انباشته منتقل شد."}
+
+
+class ReopenPreviewIn(BaseModel):
+    jy: int
+
+
+class ReopenYearIn(BaseModel):
+    jy: int
+    reason: str = Field(min_length=5, max_length=400)
+    fingerprint: str
+    acknowledge_dependencies: bool = False
+
+
+class ReverseDependentOpeningIn(BaseModel):
+    source_jy: int
+    entry_id: int
+    reason: str = Field(min_length=5, max_length=400)
+    fingerprint: str
+    acknowledge_dependencies: bool = False
+
+
+@app.post("/api/fiscal/reopen-year/precheck")
+def fiscal_reopen_precheck(body: ReopenPreviewIn, request: Request,
+                           user: User = Depends(fiscal_permission("fiscal.manage"))):
+    with session_scope() as sess:
+        result = statements.reopening_precheck(sess, body.jy)
+        svc.audit(sess, user, "fiscal.reopen_precheck", "fiscal_year", str(body.jy),
+                  f"آمادگی: {result['ready']}؛ وابستگی‌های نیازمند تأیید: "
+                  f"{result['requires_acknowledgement']}؛ خطا: {len(result['errors'])}",
+                  _client_ip(request))
+        return result
+
+
+@app.post("/api/fiscal/reopen-year/reverse-opening")
+def fiscal_reverse_dependent_opening(body: ReverseDependentOpeningIn, request: Request,
+                                     user: User = Depends(fiscal_permission("fiscal.manage"))):
+    with session_scope() as sess:
+        reversal = statements.reverse_dependent_opening(
+            sess, user, body.source_jy, body.entry_id, body.reason, body.fingerprint,
+            body.acknowledge_dependencies, _client_ip(request))
+        return {"entry_id": reversal.id, "message": "افتتاحیه‌ی وابسته با سند معکوس و دلیل ثبت‌شده باطل شد؛ پیش‌نمایش بازگشایی را دوباره بگیرید."}
 
 
 @app.post("/api/fiscal/reopen-year")
-def fiscal_reopen_year(body: CloseYearIn, request: Request,
-                       user: User = Depends(require("fiscal.manage"))):
+def fiscal_reopen_year(body: ReopenYearIn, request: Request,
+                       user: User = Depends(fiscal_permission("fiscal.manage"))):
     with session_scope() as sess:
-        statements.reopen_year(sess, user, body.jy, body.note, _client_ip(request))
-        return {"jy": body.jy, "message": f"سال {body.jy} باز شد؛ سند اختتامیه ابطال شد."}
+        closing = statements.reopen_year(sess, user, body.jy, body.reason, body.fingerprint,
+                                         body.acknowledge_dependencies, _client_ip(request))
+        return {"jy": body.jy, "closing_status": closing.status,
+                "message": f"سال {body.jy} از مسیر کنترل‌شده باز شد؛ سند اختتامیه با سند معکوس حفظ شد."}
 
+
+@app.post("/api/fiscal/opening/preview")
+def fiscal_opening_preview(body: OpeningIn, request: Request,
+                           user: User = Depends(fiscal_permission("fiscal.manage"))):
+    raw_lines = [line.model_dump() if hasattr(line, "model_dump") else line.dict() for line in body.lines]
+    with session_scope() as sess:
+        result = statements.opening_preview(sess, body.destination_jy, body.mode,
+                                           body.source_jy, raw_lines)
+        svc.audit(sess, user, "fiscal.opening_precheck", "fiscal_year", str(body.destination_jy),
+                  f"روش: {body.mode}؛ آماده: {result['ready']}؛ خطا: {len(result['errors'])}",
+                  _client_ip(request))
+        return _fiscal_preview_json(result)
+
+
+@app.post("/api/fiscal/opening/draft")
+def fiscal_opening_draft(body: OpeningIn, request: Request,
+                         user: User = Depends(fiscal_permission("fiscal.manage"))):
+    raw_lines = [line.model_dump() if hasattr(line, "model_dump") else line.dict() for line in body.lines]
+    with session_scope() as sess:
+        entry = statements.create_opening_draft(sess, user, body.destination_jy,
+                                                body.mode, body.fingerprint,
+                                                body.source_jy, raw_lines, _client_ip(request))
+        return {"entry": _entry_json(sess, entry) if entry else None,
+                "message": ("پیش‌نویس افتتاحیه آماده‌ی بازبینی است؛ منشأ آن در سند ثبت شده است."
+                            if entry else "مانده‌ی دائمی برای انتقال وجود نداشت؛ سند صفرسطر ساخته نشد.")}
+
+
+@app.post("/api/fiscal/opening/post")
+def fiscal_opening_post(body: OpeningIn, request: Request,
+                        user: User = Depends(fiscal_permission("fiscal.manage"))):
+    raw_lines = [line.model_dump() if hasattr(line, "model_dump") else line.dict() for line in body.lines]
+    with session_scope() as sess:
+        result = statements.finalize_opening(sess, user, body.destination_jy,
+                                             body.mode, body.fingerprint,
+                                             body.draft_entry_id, body.source_jy,
+                                             raw_lines, _client_ip(request))
+        entry = result["entry"]
+        return {"entry": _entry_json(sess, entry) if entry else None,
+                "reconciliation": result["reconciliation"],
+                "message": (f"افتتاحیه‌ی سال {body.destination_jy} ثبت شد؛ تطبیق پایان/ابتدای سال بررسی شد."
+                            if entry else "مانده‌ی دائمی برای انتقال وجود نداشت؛ سند صفرسطر ساخته نشد.")}
+
+
+@app.get("/api/fiscal/opening/reconcile")
+def fiscal_opening_reconcile(source_jy: int, destination_jy: int,
+                             user: User = Depends(fiscal_permission("fiscal.view"))):
+    with session_scope() as sess:
+        return _fiscal_preview_json(statements.opening_reconciliation(sess, source_jy, destination_jy))
 
 # ---------------------------------------------------------------- خروجی‌های اکسل فاز ۴
 @app.get("/api/export/assets.xlsx")

@@ -2089,8 +2089,10 @@ views.periods = async (view) => {
         <thead><tr><th>دوره</th><th>وضعیت</th><th></th></tr></thead>
         <tbody>${d.rows.map((p) => `<tr><td>${esc(p.title)}</td>
           <td><span class="badge ${p.status}">${p.status === "open" ? "باز" : "بسته"}</span></td>
-          <td>${can("fiscal.manage") ? `<button class="btn small" data-jy="${p.jy}" data-jm="${p.jm}" data-status="${p.status}">
-            ${p.status === "open" ? "بستن دوره" : "باز کردن دوره"}</button>` : ""}</td></tr>`).join("")}</tbody>
+          <td>${can("fiscal.manage") ? (p.year_status === "closed"
+            ? `<span class="small muted">برای تغییر دوره، سال را از مسیر بازگشایی کنترل‌شده باز کنید.</span>`
+            : `<button class="btn small" data-jy="${p.jy}" data-jm="${p.jm}" data-status="${p.status}">
+              ${p.status === "open" ? "بستن دوره" : "باز کردن دوره"}</button>`) : ""}</td></tr>`).join("")}</tbody>
       </table></div>
     </div>`;
   view.querySelectorAll("[data-jy]").forEach((b) => b.addEventListener("click", async () => {
@@ -5602,97 +5604,283 @@ views.statements = async (view, params) => {
 };
 
 /* ==================================================================
-   فاز ۴ — بستن سال مالی
+   فاز ۴ — بستن و افتتاح سال مالی
    ================================================================== */
 views.closing = async (view) => {
   const d = await api("/fiscal/years");
-  const current = d.current;
+  const current = Number(d.current);
+  const yearRows = d.rows || [];
+  const nextYearFor = (jy) => yearRows.find((item) => Number(item.jy) === Number(jy) + 1);
   view.innerHTML = `
     <div class="card">
-      <h3>سال‌های مالی</h3>
-      <p class="small muted">سال مالی آژانس از ۱ فروردین تا ۲۹ اسفند است.
-        با بستن سال، یک سند «اختتامیه» ثبت می‌شود: حساب‌های درآمد و هزینه‌ی آن سال صفر می‌شوند و
-        سود (زیان) به حساب «سود و زیان انباشته» منتقل می‌شود. بعد از آن، سند جدید در آن سال ثبت نمی‌شود.</p>
+      <div class="row-actions" style="justify-content:space-between;align-items:center">
+        <div><h3>سال‌های مالی</h3>
+          <p class="small muted">اختتامیه پس از پیش‌بررسی و بازبینی ثبت می‌شود. اگر اسفند بسته است، طبق رویه‌ی مصوب ابتدا آن را از صفحه‌ی دوره‌ها باز کنید.
+          افتتاحیه‌ی سال بعد فقط مانده‌ی حساب‌های دائمی را منتقل می‌کند.</p></div>
+        ${can("fiscal.manage") ? `<div class="row-actions"><button id="fy-create-year" class="btn">ایجاد سال باز</button><button id="fy-initial-opening" class="btn">افتتاحیه‌ی اولیه</button></div>` : ""}
+      </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>سال</th><th>از</th><th>تا</th><th>وضعیت</th><th>سود (زیان)</th><th>تاریخ بستن</th><th>پیش‌نویس‌ها</th><th></th></tr></thead>
-        <tbody>${d.rows.map((y) => `<tr>
-          <td><strong>${faDigits(y.title)}</strong>${String(y.jy) === String(current) ? ' <span class="pill">سال جاری</span>' : ""}</td>
-          <td class="num">${faDigits(y.start)}</td><td class="num">${faDigits(y.end)}</td>
-          <td><span class="badge ${y.status === "closed" ? "closed" : "open"}">${y.status === "closed" ? "بسته" : "باز"}</span></td>
-          <td class="num">${y.profit !== null ? fmt(y.profit) : "—"}</td>
-          <td class="num">${esc(y.closed_at || "—")}</td>
-          <td class="num">${y.draft_count ? `<span class="badge draft">${faDigits(y.draft_count)}</span>` : "—"}</td>
-          <td><div class="row-actions">
-            ${can("fiscal.manage") && y.status === "open"
-              ? `<button class="btn small primary" data-close="${y.jy}">بستن سال</button>` : ""}
-            ${can("fiscal.manage") && y.status === "closed"
-              ? `<button class="btn small" data-reopen="${y.jy}">باز کردن سال</button>` : ""}
-            <button class="btn small" data-view="${y.jy}">گزارش‌های سال</button>
-          </div></td></tr>`).join("")}</tbody>
+        <thead><tr><th>سال</th><th>از</th><th>تا</th><th>وضعیت سال</th><th>دوره‌ها</th><th>وضعیت افتتاحیه</th><th>سود/زیان</th><th>اختتامیه</th><th>افتتاحیه‌ی سال بعد</th><th>پیش‌نویس‌ها</th><th></th></tr></thead>
+        <tbody>${yearRows.map((y) => {
+          const next = nextYearFor(y.jy);
+          return `<tr>
+            <td><strong>${faDigits(y.title)}</strong>${Number(y.jy) === current ? ' <span class="pill">سال جاری</span>' : ""}</td>
+            <td class="num">${faDigits(y.start)}</td><td class="num">${faDigits(y.end)}</td>
+            <td><span class="badge ${y.status === "closed" ? "closed" : "open"}">${y.status === "closed" ? "بسته" : "باز"}</span></td>
+            <td title="${esc((y.periods || []).map((p) => `${p.jm}:${p.status}`).join(" · "))}">${faDigits((y.periods || []).filter((p) => p.status === "closed").length)} بسته · ${faDigits((y.periods || []).filter((p) => p.status !== "closed").length)} باز</td>
+            <td>${({ posted: `ثبت‌شده · سند ${faDigits(y.opening_entry_id)}`, draft: `پیش‌نویس · سند ${faDigits(y.opening_draft_entry_id)}`, reversed: "معکوس‌شده — نیازمند تطبیق", missing: "ایجاد نشده" })[y.opening_status] || "نامشخص"}</td>
+            <td class="num">${y.profit !== null ? fmt(y.profit) : "—"}</td>
+            <td>${y.closing_status === "closed" ? `ثبت‌شده${y.closing_entry_id ? ` · سند ${faDigits(y.closing_entry_id)}` : " · بدون سطر مالی"}` : "—"}</td>
+            <td>${next?.opening_entry_id ? `ثبت‌شده · سند ${faDigits(next.opening_entry_id)}` : next?.opening_draft_entry_id ? `پیش‌نویس · سند ${faDigits(next.opening_draft_entry_id)}` : y.status === "closed" ? (next?.opening_status === "reversed" ? "معکوس‌شده" : "ایجاد نشده") : "—"}</td>
+            <td class="num">${y.draft_count ? `<span class="badge draft">${faDigits(y.draft_count)}</span>` : "—"}</td>
+            <td><div class="row-actions">
+              ${can("fiscal.manage") && y.status === "open"
+                ? `<button class="btn small primary" data-close="${y.jy}">پیش‌بررسی و بستن</button>` : ""}
+              ${can("fiscal.manage") && y.status === "closed"
+                ? `<button class="btn small" data-reopen="${y.jy}">باز کردن سال</button>` : ""}
+              ${can("fiscal.manage") && y.status === "closed"
+                ? `<button class="btn small" data-opening="${y.jy + 1}" data-source="${y.jy}" data-existing="${next?.opening_entry_id ? "1" : "0"}">${next?.opening_entry_id ? "تطبیق افتتاحیه" : next?.opening_draft_entry_id ? "تکمیل پیش‌نویس افتتاحیه" : "افتتاحیه‌ی سال بعد"}</button>` : ""}
+              <button class="btn small" data-view="${y.jy}">گزارش‌های سال</button>
+            </div></td></tr>`;
+        }).join("")}</tbody>
       </table></div>
-      ${!can("fiscal.manage") ? `<p class="small muted" style="margin-top:10px">بستن و باز کردن سال فقط کار حسابدار است.</p>` : ""}
+      ${!can("fiscal.manage") ? `<p class="small muted" style="margin-top:10px">عملیات افتتاحیه و اختتامیه فقط برای حسابدار مجاز است.</p>` : ""}
     </div>
-
     <div class="grid cols-2">
-      <div class="card"><h3>قبل از بستن سال</h3>
-        <ul style="margin:0;padding-inline-start:18px;font-size:14px">
-          <li>همه‌ی پیش‌نویس‌های سال تعیین تکلیف شده باشند (ثبت نهایی یا حذف).</li>
-          <li>استهلاک دارایی‌های ثابت تا اسفند همان سال ثبت شده باشد.</li>
-          <li>حقوق اسفند ثبت و پرداخت شده باشد.</li>
-          <li>مانده‌ی صندوق و بانک با صورت‌حساب‌ها خوانده شده باشد.</li>
-        </ul></div>
-      <div class="card"><h3>بعد از بستن سال</h3>
-        <p class="small muted">سال قفل می‌شود؛ اگر بعداً سندی مربوط به آن سال پیدا شد، با دکمه‌ی
-          «باز کردن سال» برمی‌گردید، سند را ثبت می‌کنید و دوباره سال را می‌بندید.</p>
-        <div class="modal-actions" style="border:0;padding:0;margin:0">
-          <button id="cl-st" class="btn">دیدن صورت‌های مالی</button>
-        </div></div>
+      <div class="card"><h3>کنترل‌های پیش از اختتامیه</h3>
+        <p class="small muted">پیش‌نویس‌های روزنامه مسدودکننده‌اند. پیش‌نویس فاکتور، صورتحساب، حقوق یا استهلاک به‌صورت هشدار نمایش داده می‌شود تا حسابدار وضعیت زیرسیستم را بررسی کند.</p></div>
+      <div class="card"><h3>افتتاحیه و تطبیق</h3>
+        <p class="small muted">افتتاحیه از مانده‌ی پایان سال مبدأ ساخته می‌شود؛ فاکتور، تسویه، چک یا عملیات سفر دوباره ایجاد نمی‌شود. اختلاف‌های هر حساب و تفصیلی جداگانه گزارش می‌شوند.</p></div>
     </div>`;
 
-  $("#cl-st").addEventListener("click", () => go("statements"));
-  view.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () =>
-    go("statements", { tab: "income", from: `${b.dataset.view}/01/01`, to: `${b.dataset.view}/12/29` })));
+  $("#fy-create-year")?.addEventListener("click", () => createFiscalYearModal());
+  $("#fy-initial-opening")?.addEventListener("click", () => openingWizard(null, null));
   view.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeYearModal(Number(b.dataset.close))));
-  view.querySelectorAll("[data-reopen]").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm(`سال ${b.dataset.reopen} باز شود؟ سند اختتامیه ابطال می‌شود و می‌توانید سند تازه ثبت کنید.`)) return;
-    try {
-      const res = await api("/fiscal/reopen-year", { method: "POST", body: { jy: Number(b.dataset.reopen), note: "باز کردن سال از روی صفحه" } });
-      toast(res.message, "ok");
-      go("closing");
-    } catch (err) { toast(err.message, "bad"); }
+  view.querySelectorAll("[data-opening]").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.existing === "1") showOpeningReconciliation(Number(b.dataset.source), Number(b.dataset.opening));
+    else openingWizard(Number(b.dataset.opening), Number(b.dataset.source));
+  }));
+  view.querySelectorAll("[data-reopen]").forEach((b) => b.addEventListener("click", () => reopenYearModal(Number(b.dataset.reopen))));
+  view.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => {
+    const y = yearRows.find((item) => Number(item.jy) === Number(b.dataset.view));
+    go("statements", { tab: "income", from: y?.start, to: y?.end });
   }));
 };
 
-async function closeYearModal(jy) {
-  let preview = null;
-  try {
-    preview = await api(`/reports/income-statement?frm=${jy}/01/01&to=${jy}/12/29`);
-  } catch (err) { /* پیش‌نمایش اختیاری است */ }
-  const modal = openModal(`
-    <h3>بستن سال مالی ${faDigits(jy)}</h3>
-    ${preview ? `<div class="totals" style="font-size:15px">
-      <span>درآمد سال: <strong class="num">${fmt(preview.total_revenue)}</strong></span>
-      <span>هزینه سال: <strong class="num">${fmt(preview.total_expense)}</strong></span>
-      <span class="${preview.is_profit ? "ok" : "bad"}">${preview.is_profit ? "سود" : "زیان"}:
-        <strong class="num">${fmt(Math.abs(preview.profit))}</strong> ریال</span></div>` : ""}
-    <div class="note warn" style="margin-top:12px">با تأیید شما این کار انجام می‌شود:
-      یک سند اختتامیه ثبت می‌شود، حساب‌های درآمد و هزینه‌ی ${faDigits(jy)} صفر می‌شوند،
-      سود (زیان) به «سود و زیان انباشته» می‌رود و ثبت سند جدید در سال ${faDigits(jy)} قفل می‌شود.
-      این کار قابل بازگشت است (باز کردن سال).</div>
-    <label style="margin-top:12px">یادداشت برای ردّ کار (اختیاری)
-      <input id="cy-note" placeholder="مثلاً بستن سال ۱۴۰۴ با تأیید کارفرما"></label>
-    <div class="modal-actions">
-      <button id="cy-go" class="btn primary">می‌خواهم ببندم</button>
-      <button id="cy-cancel" class="btn">بی‌خیال</button>
-    </div>`);
-  $("#cy-cancel", modal).addEventListener("click", closeModal);
-  $("#cy-go", modal).addEventListener("click", async () => {
+async function createFiscalYearModal() {
+  const current = Number((await api("/fiscal/years")).current || 1405);
+  const modal = openModal(`<h3>ایجاد سال مالی باز</h3>
+    <p class="small muted">سال از ۱ فروردین تا پایان اسفند و با ۱۲ دوره‌ی باز ایجاد می‌شود. این کار سند افتتاحیه یا اختتامیه نمی‌سازد؛ ایجاد سال قبل از بستن سال قبل مجاز است.</p>
+    <label>سال شمسی<input id="fy-new-jy" inputmode="numeric" value="${faDigits(current + 1)}"></label>
+    <div class="modal-actions"><button id="fy-new-save" class="btn primary">ایجاد سال و دوره‌ها</button><button id="fy-new-cancel" class="btn">انصراف</button></div>`);
+  $("#fy-new-cancel", modal).addEventListener("click", closeModal);
+  $("#fy-new-save", modal).addEventListener("click", async (event) => {
+    const button = event.currentTarget; button.disabled = true;
     try {
-      const res = await api("/fiscal/close-year", { method: "POST", body: { jy, note: $("#cy-note", modal).value } });
+      const jy = Number(numToLatin($("#fy-new-jy", modal).value));
+      const result = await api("/fiscal/years", { method: "POST", body: { jy } });
+      closeModal(); toast(result.message, "ok"); go("closing");
+    } catch (err) { button.disabled = false; toast(err.message, "bad"); }
+  });
+}
+
+async function reopenYearModal(jy) {
+  let preview;
+  try { preview = await api("/fiscal/reopen-year/precheck", { method: "POST", body: { jy } }); }
+  catch (err) { toast(err.message, "bad"); return; }
+  const downstream = (preview.downstream || []).map((row) => `<li>سال ${faDigits(row.jy)}: ${faDigits(row.posted_count)} سند ثبت‌شده، ${faDigits(row.draft_count)} پیش‌نویس${row.entry_ids?.length ? ` — شناسه‌ها: ${row.entry_ids.map(faDigits).join("، ")}` : ""}</li>`).join("");
+  const activeOpenings = preview.active_opening_ids?.length
+    ? `<div class="note bad">بازگشایی تا تعیین تکلیف افتتاحیه‌های انتقالی متوقف است. پس از بررسی برنامه و تأیید وابستگی‌ها، افتتاحیه را با دلیل و سند معکوس باطل کنید؛ سپس پیش‌نمایش تازه بگیرید.<div class="row-actions" style="margin-top:8px">${preview.active_opening_ids.map((id) => `<button type="button" class="btn small" data-reverse-opening="${id}">ابطال کنترل‌شده‌ی سند ${faDigits(id)}</button>`).join("")}</div></div>` : "";
+  const openingDetails = (preview.opening_dependencies || []).map((item) => `<li>سال مقصد ${faDigits(item.destination_jy)} · سند ${faDigits(item.entry_id)} · ${item.status === "posted" ? "ثبت‌شده" : item.status === "reversed" ? "معکوس‌شده" : "پیش‌نویس"}${item.destination_year_status === "closed" ? " · سال مقصد بسته است؛ ابتدا بازگشایی کنترل‌شده‌ی آن لازم است" : ""}${item.destination_year_status === "open" && item.destination_opening_period_status === "closed" ? " · فروردین مقصد بسته است؛ ابتدا آن را از مدیریت دوره‌ها باز کنید" : ""}${item.reversal_entry_id ? ` · سند معکوس ${faDigits(item.reversal_entry_id)}` : ""}${item.reconciliation_ready === false ? ` · مغایرت: ${esc(item.reconciliation_issue || "تطبیق ناموفق")}` : item.reconciliation_ready ? " · تطبیق فعلی منطبق" : ""}</li>`).join("");
+  const modal = openModal(`<h3>پیش‌نمایش بازگشایی سال ${faDigits(jy)}</h3>
+    <p class="small muted">محاسبه در ${esc(preview.calculated_at || "—")} انجام شد. اسناد ثبت‌شده حذف یا ویرایش نمی‌شوند؛ فقط سند اختتامیه با سند معکوس حفظ‌شونده خنثی می‌شود.</p>
+    ${fiscalIssues(preview.errors, preview.warnings)}${activeOpenings}
+    <div class="card"><strong>افتتاحیه‌های انتقالی وابسته</strong><ul>${openingDetails || "<li>افتتاحیه‌ی انتقالی وابسته‌ای پیدا نشد.</li>"}</ul></div>
+    <div class="card"><strong>عملیات سال‌های بعد</strong><ul>${downstream || "<li>عملیات بعدی پیدا نشد.</li>"}</ul></div>
+    <div class="card"><strong>برنامه‌ی اصلاح</strong><ol>${(preview.plan || []).map((item) => `<li>${esc(item)}</li>`).join("")}</ol></div>
+    ${preview.requires_acknowledgement ? `<label><input id="fy-reopen-ack" type="checkbox"> وابستگی‌های نمایش‌داده‌شده را بررسی کرده‌ام و می‌پذیرم که پس از اصلاح سال مبدأ، افتتاحیه‌ها دوباره ساخته و تطبیق شوند؛ عملیات موجود حذف نمی‌شوند.</label>` : ""}
+    <label>دلیل بازگشایی (اجباری)<textarea id="fy-reopen-reason" minlength="5" maxlength="400" rows="3" placeholder="دلیل و ارجاع اصلاح را بنویسید"></textarea></label>
+    <div class="modal-actions"><button id="fy-reopen-do" class="btn primary" ${preview.ready ? "" : "disabled"}>تأیید برنامه و بازگشایی</button><button id="fy-reopen-cancel" class="btn">انصراف</button></div>`);
+  $("#fy-reopen-cancel", modal).addEventListener("click", closeModal);
+  const button = $("#fy-reopen-do", modal);
+  const reverseButtons = [...modal.querySelectorAll("[data-reverse-opening]")];
+  const canReverseOpening = Boolean(preview.active_opening_ids?.length)
+    && (preview.errors || []).every((item) => item.code === "downstream_openings_active");
+  const sync = () => {
+    const reasonOk = $("#fy-reopen-reason", modal).value.trim().length >= 5;
+    const ackOk = !preview.requires_acknowledgement || $("#fy-reopen-ack", modal)?.checked;
+    button.disabled = !preview.ready || !reasonOk || !ackOk;
+    reverseButtons.forEach((item) => { item.disabled = !canReverseOpening || !ackOk; });
+  };
+  $("#fy-reopen-reason", modal).addEventListener("input", sync);
+  $("#fy-reopen-ack", modal)?.addEventListener("change", sync);
+  reverseButtons.forEach((reverseButton) => reverseButton.addEventListener("click", async () => {
+    const reason = window.prompt("دلیل ابطال افتتاحیه‌ی وابسته را وارد کنید (حداقل ۵ نویسه):", "");
+    if (!reason || reason.trim().length < 5) { toast("برای ابطال افتتاحیه دلیل کافی لازم است.", "bad"); return; }
+    if (!window.confirm(`سند افتتاحیه‌ی ${reverseButton.dataset.reverseOpening} با سند معکوس حفظ شود؟`)) return;
+    reverseButton.disabled = true;
+    try {
+      const result = await api("/fiscal/reopen-year/reverse-opening", { method: "POST", body: {
+        source_jy: jy, entry_id: Number(reverseButton.dataset.reverseOpening), reason: reason.trim(),
+        fingerprint: preview.fingerprint,
+        acknowledge_dependencies: Boolean($("#fy-reopen-ack", modal)?.checked),
+      } });
+      closeModal(); toast(result.message, "ok"); reopenYearModal(jy);
+    } catch (err) { reverseButton.disabled = false; toast(err.message, "bad"); }
+  }));
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const result = await api("/fiscal/reopen-year", { method: "POST", body: {
+        jy, reason: $("#fy-reopen-reason", modal).value.trim(), fingerprint: preview.fingerprint,
+        acknowledge_dependencies: Boolean($("#fy-reopen-ack", modal)?.checked),
+      } });
+      closeModal(); toast(result.message, "ok"); go("closing");
+    } catch (err) { toast(err.message, "bad"); button.disabled = false; }
+  });
+}
+
+function fiscalRowsTable(rows, mode) {
+  if (!rows?.length) return `<p class="empty">ردیفی برای نمایش وجود ندارد.</p>`;
+  if (mode === "closing") return `<div class="table-wrap"><table><thead><tr><th>کد</th><th>حساب</th><th>نوع</th><th>مانده پیش از بستن</th><th>بدهکار اختتامیه</th><th>بستانکار اختتامیه</th><th>علت</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${r.group === "income" ? "درآمد" : r.group === "expense" ? "هزینه" : "حقوق مالکانه"}</td><td class="num">${fmt(Math.abs(r.balance))} ${r.balance < 0 ? "بستانکار" : "بدهکار"}</td><td class="num">${r.debit ? fmt(r.debit) : "—"}</td><td class="num">${r.credit ? fmt(r.credit) : "—"}</td><td>${esc(r.reason)}</td></tr>`).join("")}</tbody></table></div>`;
+  if (mode === "opening") return `<div class="table-wrap"><table><thead><tr><th>کد</th><th>حساب / تفصیلی</th><th>سطح</th><th>مانده‌ی پایان مبدأ</th><th>مانده‌ی افتتاحیه</th><th>اختلاف بدهکار</th><th>اختلاف بستانکار</th><th>وضعیت</th></tr></thead><tbody>${rows.map((r) => { const source = r.source_net || 0; const opening = r.opening_net == null ? (r.debit || 0) - (r.credit || 0) : r.opening_net; return `<tr><td>${esc(r.code)}</td><td>${esc(r.name)}${r.detail_name ? `<div class="small muted">${esc(r.detail_code)} — ${esc(r.detail_name)} (${esc(r.detail_type)})</div>` : ""}</td><td>${esc(r.level || "—")}</td><td class="num">${fmt(Math.abs(source))} ${source < 0 ? "بستانکار" : "بدهکار"}</td><td class="num">${fmt(Math.abs(opening))} ${opening < 0 ? "بستانکار" : "بدهکار"}</td><td class="num">${r.difference_debit ? fmt(r.difference_debit) : "—"}</td><td class="num">${r.difference_credit ? fmt(r.difference_credit) : "—"}</td><td>${esc(r.reason || (r.matched ? "منطبق" : r.mapped ? "معتبر" : "نامعتبر"))}</td></tr>`; }).join("")}</tbody></table></div>`;
+  return "";
+}
+
+function fiscalIssues(errors, warnings) {
+  const block = errors?.length ? `<div class="note bad"><strong>خطاهای مسدودکننده</strong><ul>${errors.map((e) => `<li>${esc(e.message)}</li>`).join("")}</ul></div>` : `<div class="note ok">خطای مسدودکننده‌ای پیدا نشد.</div>`;
+  const warn = warnings?.length ? `<div class="note warn"><strong>هشدارها — نیازمند بازبینی حسابدار</strong><ul>${warnings.map((e) => `<li>${esc(e.message)}</li>`).join("")}</ul></div>` : "";
+  return block + warn;
+}
+
+async function closeYearModal(jy) {
+  let pre;
+  try { pre = await api("/fiscal/close-year/precheck", { method: "POST", body: { jy } }); }
+  catch (err) { toast(err.message, "bad"); return; }
+  let modal = openModal(`<h3>پیش‌بررسی اختتامیه‌ی ${faDigits(jy)}</h3>
+    <p class="small muted">محاسبه در ${esc(pre.calculated_at || "—")} انجام شد.</p>
+    ${fiscalIssues(pre.errors, pre.warnings)}
+    <div class="totals"><span>درآمد: <strong>${money(pre.totals?.revenue)}</strong></span><span>هزینه: <strong>${money(pre.totals?.expense)}</strong></span><span>سود/زیان: <strong>${money(pre.totals?.profit)}</strong></span><span>تراز پیشنهادی: <strong>${money(pre.totals?.debit)}</strong> / <strong>${money(pre.totals?.credit)}</strong></span></div>
+    ${fiscalRowsTable(pre.rows, "closing")}
+    <div class="modal-actions"><button id="cy-draft" class="btn primary" ${pre.ready ? "" : "disabled"}>ساخت/به‌روزرسانی پیش‌نویس</button><button id="cy-periods" class="btn">رفتن به دوره‌ها</button><button id="cy-cancel" class="btn">بستن</button></div>`);
+  $("#cy-cancel", modal).addEventListener("click", closeModal);
+  $("#cy-periods", modal).addEventListener("click", () => { closeModal(); go("periods"); });
+  $("#cy-draft", modal).addEventListener("click", async (buttonEvent) => {
+    const button = buttonEvent.currentTarget; button.disabled = true;
+    try {
+      const drafted = await api("/fiscal/close-year/draft", { method: "POST", body: { jy, fingerprint: pre.fingerprint } });
       closeModal();
-      toast(res.message, "ok");
-      go("closing");
+      modal = openModal(`<h3>بازبینی پیش‌نویس اختتامیه‌ی ${faDigits(jy)}</h3>
+        <p class="small muted">سند تا زمان تأیید ثبت نهایی نشده و دفتر را تغییر نداده است.</p>
+        ${drafted.entry ? `<p>شماره‌ی پیش‌نویس: ${faDigits(drafted.entry.id)} · تراز: ${money(drafted.entry.debit_total)} / ${money(drafted.entry.credit_total)}</p>
+          <div class="table-wrap"><table><thead><tr><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead><tbody>${drafted.entry.lines.map((l) => `<tr><td>${esc(l.account_label)}</td><td>${esc(l.description)}</td><td class="num">${l.debit ? fmt(l.debit) : "—"}</td><td class="num">${l.credit ? fmt(l.credit) : "—"}</td></tr>`).join("")}</tbody></table></div>` : `<div class="note warn">${esc(drafted.message)}</div>`}
+        ${fiscalIssues(drafted.preview.errors, drafted.preview.warnings)}
+        <label>یادداشت ثبت نهایی (اختیاری)<input id="cy-note" maxlength="255" placeholder="یادداشت قابل ممیزی"></label>
+        <div class="note warn">با تأیید نهایی، سال قفل و دوره‌های باز آن بسته می‌شوند. اسناد ثبت‌شده حذف یا ویرایش نمی‌شوند.</div>
+        <div class="modal-actions"><button id="cy-post" class="btn primary" ${drafted.preview.ready ? "" : "disabled"}>تأیید و ثبت نهایی</button><button id="cy-back" class="btn">بازگشت به پیش‌بررسی</button><button id="cy-cancel" class="btn">انصراف</button></div>`);
+      $("#cy-cancel", modal).addEventListener("click", closeModal);
+      $("#cy-back", modal).addEventListener("click", () => closeYearModal(jy));
+      $("#cy-post", modal).addEventListener("click", async (ev) => {
+        const postButton = ev.currentTarget; postButton.disabled = true;
+        try {
+          const result = await api("/fiscal/close-year", { method: "POST", body: {
+            jy, note: $("#cy-note", modal).value,
+            fingerprint: pre.fingerprint, draft_entry_id: drafted.entry?.id ?? null,
+          } });
+          closeModal(); toast(result.message, "ok"); go("closing");
+        } catch (err) { postButton.disabled = false; toast(err.message, "bad"); }
+      });
+    } catch (err) { button.disabled = false; toast(err.message, "bad"); }
+  });
+}
+
+async function showOpeningReconciliation(source_jy, destination_jy) {
+  try {
+    const result = await api(`/fiscal/opening/reconcile?source_jy=${source_jy}&destination_jy=${destination_jy}`);
+    const modal = openModal(`<h3>تطبیق افتتاحیه‌ی ${faDigits(destination_jy)}</h3>
+      <p class="small muted">پایان مبدأ: ${esc(result.source_end)} · ابتدای مقصد: ${esc(result.destination_start)} · سند: ${result.entry_id ? faDigits(result.entry_id) : "—"}</p>
+      <div class="totals"><span>منطبق: ${faDigits(result.matched_count)}</span><span>نامنطبق: ${faDigits(result.unmatched_count)}</span><span>اختلاف بدهکار: ${money(result.difference_debit)}</span><span>اختلاف بستانکار: ${money(result.difference_credit)}</span></div>
+      ${result.ready ? `<div class="note ok">افتتاحیه با مانده‌ی پایان سال مبدأ منطبق است.</div>` : `<div class="note bad">تطبیق کامل نیست؛ اختلاف‌ها را بررسی کنید و افتتاحیه‌ی دیگری نسازید.</div>`}
+      ${fiscalRowsTable(result.rows, "opening")}
+      <div class="modal-actions"><button id="or-close" class="btn">بستن</button></div>`);
+    $("#or-close", modal).addEventListener("click", closeModal);
+  } catch (err) { toast(err.message, "bad"); }
+}
+
+function rialInput(value = "") {
+  return `<input class="open-amount" type="text" inputmode="numeric" value="${esc(value)}" placeholder="ریال">`;
+}
+
+async function openingWizard(destinationDefault, sourceDefault) {
+  let accounts = [];
+  try {
+    const a = await api("/accounts");
+    accounts = (a.rows || []).filter((x) => x.kind === "ledger" && x.group_type === "permanent"
+      && x.report_type === "balance_sheet" && x.is_active);
+  } catch (err) { toast(err.message, "bad"); return; }
+  const opts = accounts.map((a) => `<option value="${a.id}">${esc(a.code)} — ${esc(a.name)}</option>`).join("");
+  let modal = openModal(`<h3>افتتاحیه‌ی سال مالی</h3>
+    <div class="grid cols-2"><label>سال مقصد<input id="op-dest" inputmode="numeric" value="${destinationDefault || ""}" placeholder="مثلاً ۱۴۰۶"></label>
+      <label>روش افتتاحیه<select id="op-mode"><option value="transfer">انتقال از سال قبل سامانه</option><option value="initial">ورود اولیه از منبع بیرونی</option></select></label></div>
+    <p id="op-origin" class="small muted">مبدأ باید سال بلافاصله قبل از مقصد و بسته‌شده باشد.</p>
+    <div id="op-initial" style="display:none"><div class="row-actions"><button type="button" id="op-add-line" class="btn small">افزودن سطر</button></div><div id="op-lines"></div></div>
+    <div id="op-result"></div>
+    <div class="modal-actions"><button id="op-preview" class="btn primary">پیش‌نمایش</button><button id="op-cancel" class="btn">بستن</button></div>`);
+  const $in = (selector) => $(selector, modal);
+  $in("#op-mode").value = sourceDefault != null ? "transfer" : "initial";
+  $in("#op-dest").value = destinationDefault || "";
+  $in("#op-mode").addEventListener("change", () => {
+    $in("#op-initial").style.display = $in("#op-mode").value === "initial" ? "block" : "none";
+    $in("#op-origin").textContent = $in("#op-mode").value === "transfer"
+      ? "مانده‌ها از پایان سال مالی قبلیِ بسته‌شده استخراج می‌شوند."
+      : "منشأ به‌صراحت ورود بیرونی ثبت می‌شود و سند وانمود نمی‌کند از سال قبل استخراج شده است.";
+    $in("#op-result").innerHTML = "";
+  });
+  const addLine = () => {
+    const row = document.createElement("div"); row.className = "grid cols-4 opening-input-row";
+    row.innerHTML = `<label>حساب<select class="open-account">${opts}</select></label><label>سمت<select class="open-side"><option value="debit">بدهکار</option><option value="credit">بستانکار</option></select></label><label>مبلغ ${rialInput()}</label><label>شرح<input class="open-desc" value="مانده‌ی افتتاحیه‌ی اولیه" maxlength="300"></label><button type="button" class="btn small open-remove">حذف سطر</button>`;
+    row.querySelector(".open-remove").addEventListener("click", () => row.remove());
+    $in("#op-lines").appendChild(row);
+  };
+  $in("#op-add-line").addEventListener("click", addLine);
+  if (sourceDefault == null) addLine();
+  $in("#op-cancel").addEventListener("click", closeModal);
+  $in("#op-preview").addEventListener("click", async (ev) => {
+    const button = ev.currentTarget; button.disabled = true;
+    const destination_jy = Number(numToLatin($in("#op-dest").value));
+    const mode = $in("#op-mode").value;
+    const source_jy = mode === "transfer" ? destination_jy - 1 : null;
+    const lines = mode === "initial" ? [...modal.querySelectorAll(".opening-input-row")].map((row) => {
+      const amountText = numToLatin(row.querySelector(".open-amount").value).replace(/[ ,٬]/g, "");
+      const amount = Number.parseInt(amountText || "0", 10) || 0;
+      const debit = row.querySelector(".open-side").value === "debit" ? amount : 0;
+      const credit = row.querySelector(".open-side").value === "credit" ? amount : 0;
+      return { account_id: Number(row.querySelector(".open-account").value), debit, credit,
+        description: row.querySelector(".open-desc").value };
+    }).filter((line) => line.debit || line.credit) : [];
+    const payload = { destination_jy, source_jy, mode, lines };
+    try {
+      const pre = await api("/fiscal/opening/preview", { method: "POST", body: payload });
+      if (!pre.ready) {
+        $in("#op-result").innerHTML = `<p class="small muted">محاسبه در ${esc(pre.calculated_at || "—")} انجام شد.</p>${fiscalIssues(pre.errors, pre.warnings)}${fiscalRowsTable(pre.rows, "opening")}`;
+        button.disabled = false; return;
+      }
+      let drafted = { entry: null, message: "مانده‌ی صفر؛ سندی برای ثبت لازم نیست." };
+      if (pre.lines.length) drafted = await api("/fiscal/opening/draft", { method: "POST", body: { ...payload, fingerprint: pre.fingerprint } });
+      const entryHtml = drafted.entry ? `<h4>پیش‌نویس ${faDigits(drafted.entry.id)} — قابل‌ویرایش نیست؛ برای اصلاح باید پیش‌نمایش تازه بگیرید.</h4><div class="table-wrap"><table><thead><tr><th>حساب</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th></tr></thead><tbody>${drafted.entry.lines.map((l) => `<tr><td>${esc(l.account_label)}</td><td>${esc(l.description)}</td><td class="num">${l.debit ? fmt(l.debit) : "—"}</td><td class="num">${l.credit ? fmt(l.credit) : "—"}</td></tr>`).join("")}</tbody></table></div>` : `<p>${esc(drafted.message)}</p>`;
+      $in("#op-result").innerHTML = `<p class="small muted">محاسبه در ${esc(pre.calculated_at || "—")} انجام شد.</p>${fiscalIssues(pre.errors, pre.warnings)}<p><strong>${esc(pre.origin_label)}</strong></p><div class="totals"><span>بدهکار: ${money(pre.totals.debit)}</span><span>بستانکار: ${money(pre.totals.credit)}</span><span>اختلاف: ${money(pre.totals.difference)}</span></div>${fiscalRowsTable(pre.rows, "opening")}${entryHtml}<div class="note warn">پس از ثبت نهایی، انتقال فقط از مسیر ابطال رسمی قابل اصلاح است.</div><button id="op-post" class="btn primary" ${pre.ready ? "" : "disabled"}>تأیید و ثبت افتتاحیه</button>`;
+      $in("#op-post").addEventListener("click", async (postEv) => {
+        const postButton = postEv.currentTarget; postButton.disabled = true;
+        try {
+          const result = await api("/fiscal/opening/post", { method: "POST", body: {
+            ...payload, fingerprint: pre.fingerprint, draft_entry_id: drafted.entry?.id ?? null,
+          } });
+          $in("#op-result").insertAdjacentHTML("beforeend", `<div class="note ok">${esc(result.message)} ${result.reconciliation ? `منطبق: ${faDigits(result.reconciliation.matched_count)} · نامنطبق: ${faDigits(result.reconciliation.unmatched_count)}` : ""}</div>`);
+          toast(result.message, "ok");
+        } catch (err) { postButton.disabled = false; toast(err.message, "bad"); }
+      });
     } catch (err) { toast(err.message, "bad"); }
+    finally { button.disabled = false; }
   });
 }
 

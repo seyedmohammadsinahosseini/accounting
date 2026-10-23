@@ -50,7 +50,7 @@ def test_cancel_maps_to_service_revenue_account(client, accountant):
     for service_type, expected_code, extra in (
         ("visa", "4103", {}),
         ("ticket", "4102", {"flight_type": 1}),
-        ("hotel", "4103", {}),
+        ("hotel", "4110", {}),
         ("tour", "4101", {}),
     ):
         inv = _invoice(client, h, party["id"], service_type, **extra)

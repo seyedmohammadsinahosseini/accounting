@@ -126,7 +126,7 @@ def test_invoice_creates_balanced_entry_and_hits_right_accounts(client, accounta
     assert after["total_debit"] == before["total_debit"] + inv["total"]
 
     # سند فاکتور باید چهار سطر داشته باشد: مشتری، درآمد تور، درآمد بلیت، مالیات
-    entries = client.get("/api/entries?status=posted&q=فاکتور", headers=accountant).json()["rows"]
+    entries = client.get(f"/api/entries?status=posted&q={inv['number']}", headers=accountant).json()["rows"]
     assert entries
     detail = client.get(f"/api/entries/{entries[0]['id']}", headers=accountant).json()
     labels = [l["account_label"] for l in detail["lines"]]

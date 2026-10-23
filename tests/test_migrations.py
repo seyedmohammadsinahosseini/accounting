@@ -31,7 +31,7 @@ def test_legacy_schema_migrates_forward_and_is_repeatable(tmp_path, monkeypatch)
 
     applied = migrations.run_migrations()
     # 34,35,38,68 خالی هستند و اجرا نمی‌شوند (not sql) — بقیه اجرا می‌شوند
-    assert applied == list(range(1, 34)) + [36, 37] + list(range(39, 68)) + list(range(69, 83))
+    assert applied == list(range(1, 34)) + [36, 37] + list(range(39, 68)) + list(range(69, 90))
     with engine.begin() as conn:
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info(accounts)"))}
         assert {"level", "group_type", "report_type"} <= columns
@@ -40,8 +40,10 @@ def test_legacy_schema_migrates_forward_and_is_repeatable(tmp_path, monkeypatch)
         settlement_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(settlements)"))}
         assert {"revenue_model", "purchase_cost_rial", "supplier_party_id"} <= invoice_columns
         assert {"bill_type", "source_invoice_id"} <= bill_columns
+        assert {"currency_code", "fx_amount_minor", "fx_rate_rial"} <= bill_columns
         assert "target_invoice_id" in settlement_columns
-        assert "partial_cancel_id" in settlement_columns
+        assert {"partial_cancel_id", "target_bill_id",
+                "currency_code", "fx_amount_minor", "fx_rate_rial"} <= settlement_columns
         pc_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(invoice_partial_cancels)"))}
         assert {"status", "refund_mode", "agency_fee_rial", "refund_due_rial", "refund_paid_rial",
                 "supplier_claim_rial", "supplier_received_rial", "supplier_party_id",

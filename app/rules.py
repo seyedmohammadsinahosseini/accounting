@@ -43,6 +43,12 @@ SYSTEM_CODES = {
     "accumulated_depreciation": "111001",
     "gain_asset_disposal": "4106",
     "loss_asset_disposal": "5108",
+    "hotel_clearing": "2109",
+    "revenue_hotel": "4110",
+    "fx_gain": "4111",
+    "commission_expense": "5110",
+    "commission_payable": "2110",
+    "fx_loss": "5111",
     "salary_expense": "5102",
     "rent": "5103",
     "marketing": "5104",
@@ -121,6 +127,11 @@ def build_validation(raw_lines, max_lines: int = 200, require_balanced: bool = T
             credit = parse_amount(raw.get("credit", 0) or 0) if (raw.get("credit") not in (0, "0", None, "")) else 0
         except Exception as exc:  # noqa: BLE001
             v.problems.append(f"سطر {idx}: {exc}")
+            continue
+        if debit < 0 or credit < 0:
+            v.problems.append(
+                f"سطر {idx}: مبلغ نمی‌تواند منفی باشد؛ جهت سطر را با ستون بدهکار/بستانکار مشخص کنید."
+            )
             continue
         if debit > 0 and credit > 0:
             v.problems.append(

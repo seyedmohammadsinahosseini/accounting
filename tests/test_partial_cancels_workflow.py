@@ -144,7 +144,7 @@ def test_single_line_cancel_in_multi_service_invoice(client, accountant):
 
 
 # ---------- ۴) لغو جزئی رزرو هتل ----------
-def test_hotel_cancel_maps_to_other_revenue(client, accountant):
+def test_hotel_cancel_maps_to_hotel_revenue(client, accountant):
     h = accountant
     cust = _mk_party(client, h, "مشتری هتل")
     inv = _mk_invoice(client, h, cust["id"], 30_000_000, "hotel")
@@ -154,7 +154,7 @@ def test_hotel_cancel_maps_to_other_revenue(client, accountant):
         "amount": 12_000_000, "reason": "لغو دو شب از رزرو پنج‌شبه", "date": "1405/03/11"})
     assert r.status_code == 200, r.text
     L = _dr_cr(_entry_lines(client, h, r.json()["entry_id"]))
-    assert _acc_of(L, "4103") == 12_000_000
+    assert _acc_of(L, "4110") == 12_000_000
 
 
 # ---------- ۵) لغو چندمرحله‌ای در تاریخ‌های مختلف ----------

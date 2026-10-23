@@ -50,6 +50,8 @@ CHART = [
     ("2106", "مالیات حقوق پرداختنی", "ledger", "credit", "21", "liability", True),
     ("2107", "حقوق پرداختنی", "ledger", "credit", "21", "liability", True),
     ("2108", "بدهی امانی / تسویه‌نشده‌ی ایرلاین", "ledger", "credit", "21", "liability", True),
+    ("2109", "بدهی امانی / تسویه‌نشده‌ی هتل‌ها", "ledger", "credit", "21", "liability", True),
+    ("2110", "کمیسیون پرداختنی به همکاران فروش/نمایندگان", "ledger", "credit", "21", "liability", True),
 
     ("3", "حقوق مالکانه", "group", "credit", None, "equity", False),
     ("3101", "سرمایه", "ledger", "credit", "3", "equity", True),
@@ -66,6 +68,8 @@ CHART = [
     ("4107", "درآمد جریمه از مشتری — لغو خدمات", "ledger", "credit", "4", "income", True),
     ("4108", "درآمد جریمه از تامین‌کننده — لغو خرید", "ledger", "credit", "4", "income", True),
     ("4109", "تخفیف نقدی خرید", "ledger", "credit", "4", "income", True),
+    ("4110", "درآمد رزرو هتل", "ledger", "credit", "4", "income", True),
+    ("4111", "سود تسعیر ارز", "ledger", "credit", "4", "income", True),
 
     ("5", "هزینه‌ها", "group", "debit", None, "expense", False),
     ("5101", "بهای تمام‌شده‌ی خدمات", "ledger", "debit", "5", "expense", True),
@@ -77,6 +81,8 @@ CHART = [
     ("5107", "استهلاک", "ledger", "debit", "5", "expense", True),
     ("5108", "زیان فروش دارایی", "ledger", "debit", "5", "expense", True),
     ("5109", "جریمه و کنسلی تأمین‌کنندگان", "ledger", "debit", "5", "expense", True),
+    ("5110", "کمیسیون پرداختی به همکاران فروش/نمایندگان", "ledger", "debit", "5", "expense", True),
+    ("5111", "زیان تسعیر ارز", "ledger", "debit", "5", "expense", True),
 ]
 
 DEMO_USERS = [

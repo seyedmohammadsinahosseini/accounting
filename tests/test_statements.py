@@ -60,13 +60,38 @@ def _new_entry(client, headers, date, description, lines, post=True) -> dict:
     return entry
 
 
+def _close_year_workflow(client, headers, jy: int, note: str = ""):
+    pre = client.post("/api/fiscal/close-year/precheck", headers=headers, json={"jy": jy})
+    assert pre.status_code == 200, pre.text
+    assert pre.json()["ready"], pre.json()["errors"]
+    draft = client.post("/api/fiscal/close-year/draft", headers=headers,
+                        json={"jy": jy, "fingerprint": pre.json()["fingerprint"]})
+    assert draft.status_code == 200, draft.text
+    entry = draft.json()["entry"]
+    final = client.post("/api/fiscal/close-year", headers=headers, json={
+        "jy": jy, "note": note, "fingerprint": pre.json()["fingerprint"],
+        "draft_entry_id": entry["id"] if entry else None,
+    })
+    return final
+
+
+def _reopen_year_workflow(client, headers, jy, reason="دلیل بازگشایی آزمون"):
+    preview = client.post("/api/fiscal/reopen-year/precheck", headers=headers, json={"jy": jy})
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["ready"], preview.json()["errors"]
+    result = client.post("/api/fiscal/reopen-year", headers=headers, json={
+        "jy": jy, "reason": reason, "fingerprint": preview.json()["fingerprint"],
+        "acknowledge_dependencies": preview.json()["requires_acknowledgement"],
+    })
+    assert result.status_code == 200, result.text
+    return result
+
+
 def _reopen_if_closed(client, headers, jy) -> None:
     """سال آزمون باید باز باشد؛ اگر آزمون قبلی بسته گذاشته، بازش می‌کنیم."""
     years = {r["title"]: r for r in client.get("/api/fiscal/years", headers=headers).json()["rows"]}
     if str(jy) in years and years[str(jy)]["status"] == "closed":
-        r = client.post("/api/fiscal/reopen-year", headers=headers,
-                        json={"jy": jy, "note": "آماده‌سازی آزمون"})
-        assert r.status_code == 200, r.text
+        _reopen_year_workflow(client, headers, jy, "آماده‌سازی آزمون")
 
 
 def test_balance_sheet_balances(client, accountant):
@@ -172,8 +197,7 @@ def test_close_year_and_reopen(client, accountant):
     before_income = _income(client, accountant, frm="1404/01/01", to="1404/12/29")
     expected = before_income["profit"]
 
-    close = client.post("/api/fiscal/close-year", headers=accountant,
-                        json={"jy": 1404, "note": "آزمون بستن سال"})
+    close = _close_year_workflow(client, accountant, 1404, "آزمون بستن سال")
     assert close.status_code == 200, close.text
     assert close.json()["profit"] == expected, close.text
 
@@ -197,6 +221,10 @@ def test_close_year_and_reopen(client, accountant):
     # سال بسته شده و ثبت سند تازه در آن ممکن نیست
     status = {r["title"]: r for r in client.get("/api/fiscal/years", headers=accountant).json()["rows"]}
     assert status["1404"]["status"] == "closed"
+    period_reopen = client.post("/api/periods/reopen", headers=accountant,
+                                json={"jy": 1404, "jm": 6})
+    assert period_reopen.status_code == 400
+    assert "بازگشایی سال" in period_reopen.json()["detail"]
     blocked = client.post("/api/entries", headers=accountant, json={
         "date": "1404/07/01", "description": "سند در سال بسته",
         "lines": [{"account_id": cash, "debit": 1000, "credit": 0, "description": "x"},
@@ -211,9 +239,7 @@ def test_close_year_and_reopen(client, accountant):
     assert bs["balanced"] is True, bs
 
     # بازگشایی: سند اختتامیه ابطال می‌شود و ثبت سند تازه دوباره ممکن است
-    back = client.post("/api/fiscal/reopen-year", headers=accountant,
-                       json={"jy": 1404, "note": "آزمون بازگشایی"})
-    assert back.status_code == 200, back.text
+    _reopen_year_workflow(client, accountant, 1404, "آزمون بازگشایی پس از بررسی وابستگی‌ها")
     assert _balance_of(client, accountant, "3102", frm="1404/01/01", to="1404/12/29") == before, \
         "با بازگشایی سال، سود انباشته باید به حالت قبل برگردد"
     _new_entry(client, accountant, "1404/07/02", "سند بعد از بازگشایی",
@@ -238,10 +264,10 @@ def test_close_year_blocked_by_draft(client, accountant):
     _ = draft
     # پاک‌سازی: این پیش‌نویس را ثبت نهایی می‌کنیم تا باقی آزمون‌ها تمیز بمانند
     assert client.post(f"/api/entries/{draft['id']}/post", headers=accountant).status_code == 200
-    assert client.post("/api/fiscal/close-year", headers=accountant,
-                       json={"jy": 1404, "note": "آزمون بستن با پیش‌نویس"}).status_code == 200
-    assert client.post("/api/fiscal/reopen-year", headers=accountant,
-                       json={"jy": 1404, "note": "پاک‌سازی آزمون"}).status_code == 200
+    assert _close_year_workflow(client, accountant, 1404,
+                                "آزمون بستن با پیش‌نویس").status_code == 200
+    assert _reopen_year_workflow(client, accountant, 1404,
+                                 "پاک‌سازی آزمون پس از بررسی وابستگی‌ها").status_code == 200
 
 
 def test_export_statement_excel(client, accountant):

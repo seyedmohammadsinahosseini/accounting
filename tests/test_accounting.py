@@ -232,21 +232,29 @@ def test_transfer_rejects_same_account_and_non_bank(client, accountant):
 # --------------------------------------------------------------- بستن دوره
 def test_closed_period_blocks_new_postings(client, accountant):
     jy, jm, _ = jd.jalali_parts(jd.jtoday())
-    assert client.post("/api/periods/close", headers=accountant,
-                       json={"jy": jy, "jm": jm}).status_code == 200
     bank = account_id(client, accountant, "110201")
     rent = account_id(client, accountant, "5103")
-    e = client.post("/api/entries", headers=accountant, json={
-        "date": jd.jalali_str(jd.jtoday()), "description": "آزمون دوره بسته",
+    created = client.post("/api/entries", headers=accountant, json={
+        "date": jd.jalali_str(jd.jtoday()), "description": "پیش‌نویس پیش از بستن دوره",
         "lines": [{"account_id": rent, "debit": 2_000_000, "credit": 0},
                   {"account_id": bank, "debit": 0, "credit": 2_000_000}],
-    }).json()
-    blocked = client.post(f"/api/entries/{e['id']}/post", headers=accountant)
+    })
+    assert created.status_code == 200, created.text
+    entry_id = created.json()["id"]
+    assert client.post("/api/periods/close", headers=accountant,
+                       json={"jy": jy, "jm": jm}).status_code == 200
+    new_draft = client.post("/api/entries", headers=accountant, json={
+        "date": jd.jalali_str(jd.jtoday()), "description": "سند تازه در دوره بسته",
+        "lines": [{"account_id": rent, "debit": 1_000, "credit": 0},
+                  {"account_id": bank, "debit": 0, "credit": 1_000}],
+    })
+    assert new_draft.status_code == 400 and "بسته" in new_draft.json()["detail"]
+    blocked = client.post(f"/api/entries/{entry_id}/post", headers=accountant)
     assert blocked.status_code == 400
-    assert "بسته شده" in blocked.json()["detail"]
+    assert "بسته" in blocked.json()["detail"]
     assert client.post("/api/periods/reopen", headers=accountant,
                        json={"jy": jy, "jm": jm}).status_code == 200
-    ok = client.post(f"/api/entries/{e['id']}/post", headers=accountant)
+    ok = client.post(f"/api/entries/{entry_id}/post", headers=accountant)
     assert ok.status_code == 200, ok.text
 
 

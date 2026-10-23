@@ -186,6 +186,15 @@ MIGRATIONS: list[tuple[int, str, str]] = [
     # دریافت/پرداخت چندابزاری: پیگیری حواله و چسب سند گروهی
     (81, "شماره پیگیری حواله/کارتخوان در تسویه", "ALTER TABLE settlements ADD COLUMN ref_no VARCHAR(60) NOT NULL DEFAULT ''"),
     (82, "برچسب سند چندابزاری تسویه", "ALTER TABLE settlements ADD COLUMN batch_no VARCHAR(40) NOT NULL DEFAULT ''"),
+    # تسویه‌ی ارزی (سبک): ارز و نرخ ثبت صورتحساب و ارز و نرخ روز پرداخت در تسویه
+    (83, "ارز صورتحساب تأمین‌کننده", "ALTER TABLE supplier_bills ADD COLUMN currency_code VARCHAR(8) NOT NULL DEFAULT 'IRR'"),
+    (84, "", "ALTER TABLE supplier_bills ADD COLUMN fx_amount_minor INTEGER NOT NULL DEFAULT 0"),
+    (85, "", "ALTER TABLE supplier_bills ADD COLUMN fx_rate_rial INTEGER NOT NULL DEFAULT 0"),
+    (86, "هدف تسویه: اتصال مستقیم پرداخت به یک صورتحساب (برای تسویه‌ی ارزی ضروری است)",
+     "ALTER TABLE settlements ADD COLUMN target_bill_id INTEGER REFERENCES supplier_bills(id)"),
+    (87, "ارز تسویه", "ALTER TABLE settlements ADD COLUMN currency_code VARCHAR(8) NOT NULL DEFAULT 'IRR'"),
+    (88, "", "ALTER TABLE settlements ADD COLUMN fx_amount_minor INTEGER NOT NULL DEFAULT 0"),
+    (89, "", "ALTER TABLE settlements ADD COLUMN fx_rate_rial INTEGER NOT NULL DEFAULT 0"),
 ]
 
 _TABLE = "_schema_versions"

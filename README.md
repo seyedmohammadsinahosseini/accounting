@@ -7,7 +7,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-red.svg?logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
-[![Test Suite](https://img.shields.io/badge/pytest-142%20passed-brightgreen.svg?logo=pytest&logoColor=white)](tests/)
+[![Test Suite](https://img.shields.io/badge/pytest-241%20passed-brightgreen.svg?logo=pytest&logoColor=white)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-black.svg?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -180,7 +180,7 @@ When running in evaluation mode (`ACCT_DEMO_SEED=1`), the database initializes w
 
 ## Comprehensive Test Suite & Verification
 
-The platform includes an automated test suite with **142 tests** covering core accounting rules, edge cases, tax calculations, cryptographic vault security, Excel roundtripping, counter sales, targeted settlement allocation, idempotency, rollback behavior, and cash-calendar due dates.
+The platform includes an automated test suite with **241 tests** covering core accounting rules, edge cases, tax calculations, cryptographic vault security, Excel roundtripping, counter sales, targeted settlement allocation, idempotency, rollback behavior, and cash-calendar due dates.
 
 ```bash
 # Run complete test suite
@@ -195,8 +195,8 @@ ruff check .
 
 ### Test Suite Summary
 ```text
-142 tests collected
-142 passed
+241 tests collected
+241 passed
 ```
 
 The current environment reports one upstream Starlette/httpx deprecation warning; it does not fail the suite.
@@ -265,7 +265,7 @@ python3 tools.py password admin
 ├── sample_data/
 │   ├── excel_templates/           # 14 standardized verification spreadsheets (English)
 │   └── persian_templates/         # Localized verification spreadsheets (Persian)
-├── tests/                         # 142 automated unit and integration tests
+├── tests/                         # 241 automated unit and integration tests
 ├── .dockerignore                  # Docker build exclusions
 ├── .env.example                   # Environment configuration template
 ├── .gitignore                     # Git ignore rules

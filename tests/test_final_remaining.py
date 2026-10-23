@@ -240,7 +240,9 @@ def test_multi_customer_supplier_concurrent():
 def test_all_old_and_new_pass():
     """همه تست‌های قدیمی و جدید باید پاس باشند — اگر نه، گزارش بده، ادعای پاس نکن"""
     import subprocess, sys
-    result = __import__('subprocess').run([sys.executable, "-m", "pytest", "tests/test_partial_cancel.py", "tests/test_partial_cancel_v2.py", "-q"], capture_output=True, text=True, cwd="/home/user/Agency-Final")
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    result = __import__('subprocess').run([sys.executable, "-m", "pytest", "tests/test_partial_cancel.py", "tests/test_partial_cancel_v2.py", "-q"], capture_output=True, text=True, cwd=str(repo_root))
     print(result.stdout[-500:])
     print(result.stderr[-500:])
     assert "passed" in result.stdout or result.returncode==0, f"تست‌ها باید پاس باشند: {result.stdout}"

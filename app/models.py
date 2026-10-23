@@ -307,6 +307,11 @@ class SupplierBill(Base):
     paid_rial = Column(Integer, nullable=False, default=0)
     status = Column(String(12), nullable=False, default="draft", index=True)  # draft|issued|cancelled
     entry_id = Column(Integer, ForeignKey("journal_entries.id"), nullable=True)
+    # داده‌ی ارزی اختیاری صورتحساب: کد ارز ثبت، مبلغ به کوچک‌ترین واحد ارز (مثل سنت) و نرخ دفتری
+    # (ریال به ازای یک واحد اصلی ارز، مثل ۱ یورو). پیش‌فرض IRR/0 یعنی صورتحساب کاملاً ریالی است.
+    currency_code = Column(String(8), nullable=False, default="IRR")
+    fx_amount_minor = Column(Integer, nullable=False, default=0)
+    fx_rate_rial = Column(Integer, nullable=False, default=0)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
 
@@ -335,6 +340,13 @@ class Settlement(Base):
     # برچسب گروهی — ردیف‌های یک دریافت/پرداخت چندابزاری را به هم می‌چسباند
     batch_no = Column(String(40), nullable=False, default="", index=True)
     target_invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True)
+    # پیوند صوری به صورتحساب تأمین‌کننده — الزامی برای تسویه‌ی ارزی (پرداخت تفاوت نرخ واقع‌شده)
+    target_bill_id = Column(Integer, ForeignKey("supplier_bills.id"), nullable=True)
+    # داده‌ی ارزی اختیاری تسویه: ارز پرداخت، مبلغ به کوچک‌ترین واحد ارز (مثل سنت یورو) و نرخ روز پرداخت
+    # (ریال به ازای یک واحد اصلی ارز). پیش‌فرض IRR/0 یعنی تسویه‌ی کاملاً ریالی.
+    currency_code = Column(String(8), nullable=False, default="IRR")
+    fx_amount_minor = Column(Integer, nullable=False, default=0)
+    fx_rate_rial = Column(Integer, nullable=False, default=0)
     # پیوند به لغو جزئی — برای پرداخت استرداد به مشتری یا وصول طلب از تأمین‌کننده
     partial_cancel_id = Column(Integer, ForeignKey("invoice_partial_cancels.id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
